@@ -131,19 +131,52 @@ class RecallProbe:
     top5_shas: list[str]
 
 
+_HUNK_RE = __import__("re").compile(r"^(@@ -)(\d+)(?:,(\d+))?( \+)(\d+)(?:,(\d+))?( @@.*)")
+
+
+def _invert_diff(diff_text: str) -> str:
+    """Swap '+' / '-' lines and old/new ranges in @@ headers — produces the
+    diff someone would write to undo the fix (i.e. reintroduce the bug)."""
+    out: list[str] = []
+    for line in diff_text.splitlines(keepends=True):
+        if line.startswith("@@"):
+            m = _HUNK_RE.match(line.rstrip("\n"))
+            if m:
+                _, os_, ol, _, ns, nl, rest = m.groups()
+                ol = ol if ol is not None else "1"
+                nl = nl if nl is not None else "1"
+                out.append(f"@@ -{ns},{nl} +{os_},{ol} {rest.lstrip()}\n")
+            else:
+                out.append(line)
+        elif line.startswith("---") or line.startswith("+++"):
+            out.append(line)
+        elif line.startswith("+"):
+            out.append("-" + line[1:])
+        elif line.startswith("-"):
+            out.append("+" + line[1:])
+        else:
+            out.append(line)
+    return "".join(out)
+
+
 def measure_top5_recall(
     repo: str,
     n: int = 20,
     seed: int = 42,
 ) -> tuple[float, list[RecallProbe]]:
-    """Pick `n` random indexed incidents. For each, compute the diff between
-    its buggy_parent_sha and parent's parent (i.e. the change *before* the fix
-    landed) and use that as the retrieval query. Recall@5 is the fraction
-    where the original fix sha appears in the top-5 returned hits.
+    """Pick `n` random indexed incidents. For each, take the FIX diff and
+    invert it (so '+' becomes '-' and vice versa) — this is the regression-
+    shaped query: it represents what someone undoing the fix would write.
+    Recall@5 is the fraction where the original fix sha appears in the top-5
+    hits.
+
+    Why inverse-of-fix and not parent-of-buggy-parent: the buggy parent's
+    parent is just whichever commit happened to land one earlier and is
+    frequently unrelated to the bug. The inverse of the fix is, by
+    construction, the bug being reintroduced — exactly the case the system
+    is designed to catch.
     """
     scar = ScarIndex()
-    col = scar._client.get_collection(name=scar._client.list_collections()[0].name) if False else None  # noqa: F841
-    # Pull every indexed incident's metadata so we can sample.
     col_name = repo.replace("/", "_").replace("-", "_").lower()
     col = scar._client.get_collection(name=col_name)
     count = col.count()
@@ -157,31 +190,18 @@ def measure_top5_recall(
     indices = rng.sample(range(count), sample_n)
     chosen = [fetched["metadatas"][i] for i in indices]
 
-    miner = GitMiner()
-    owner, name = repo.split("/", 1)
-    git_repo = miner._get_repo(owner, name)
-
     probes: list[RecallProbe] = []
     for i, meta in enumerate(chosen, 1):
         from app.models.schemas import Incident
         inc = Incident.model_validate_json(meta["incident_json"])
-        try:
-            # The buggy parent's diff (parent vs parent-of-parent) approximates
-            # what a contributor would see when re-introducing the bug.
-            buggy_parent = git_repo.commit(inc.buggy_parent_sha)
-            if not buggy_parent.parents:
-                continue
-            grandparent = buggy_parent.parents[0]
-            query_diff = git_repo.git.diff(grandparent.hexsha, buggy_parent.hexsha)[:8000]
-        except Exception as exc:
-            print(f"  [{i}] {inc.commit_sha[:7]} skipped — could not get parent diff: {exc}")
+        if not inc.fix_diff or not inc.fix_diff.strip():
+            print(f"  [{i}] {inc.commit_sha[:7]} skipped — empty fix_diff")
             continue
-        if not query_diff.strip():
-            continue
+        query_diff = _invert_diff(inc.fix_diff)[:8000]
 
         hits = scar.search(repo=repo, query=query_diff, top_k=5, pr_files=inc.files_changed)
         top5_shas = [h[0].commit_sha for h in hits]
-        rank = next((i for i, sha in enumerate(top5_shas, 1) if sha == inc.commit_sha), None)
+        rank = next((j for j, sha in enumerate(top5_shas, 1) if sha == inc.commit_sha), None)
         probes.append(RecallProbe(
             fix_sha=inc.commit_sha,
             fix_subject=inc.commit_message.splitlines()[0][:80] if inc.commit_message else "",
