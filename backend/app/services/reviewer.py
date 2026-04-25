@@ -21,6 +21,13 @@ MAX_TOKENS = 4096
 TEMPERATURE = 0.3
 MAX_ITERATIONS = 20
 
+# Confidence grounding: blend the model's self-reported confidence with the
+# best cosine similarity we ever returned for the matched commit. Pure model
+# confidence is freely invented; pure similarity is too coarse. Weighting
+# leans on the model (it sees the diff) but anchors on retrieval signal.
+_CONFIDENCE_MODEL_WEIGHT = 0.6
+_CONFIDENCE_SIMILARITY_WEIGHT = 0.4
+
 _SYSTEM = """\
 You are ScarTissue, a code review agent. Your job is to detect when a pull request is about to reintroduce a bug pattern that was previously fixed in this repo's history.
 
@@ -200,7 +207,11 @@ class Reviewer:
     # ── tool execution ────────────────────────────────────────────────────────
 
     async def _exec_tool(
-        self, pr: PRDiff, name: str, inp: dict[str, Any]
+        self,
+        pr: PRDiff,
+        name: str,
+        inp: dict[str, Any],
+        observed_similarity: dict[str, float] | None = None,
     ) -> Any:
         if name == "search_scar_tissue":
             # Bias retrieval toward historical commits that touched the same
@@ -226,6 +237,11 @@ class Reviewer:
                 }
                 for inc, score in hits
             ]
+            if observed_similarity is not None:
+                for inc, score in hits:
+                    prev = observed_similarity.get(inc.commit_sha, 0.0)
+                    if score > prev:
+                        observed_similarity[inc.commit_sha] = score
             if results:
                 return {"results": results, "indexed_incidents": stats["count"]}
             # Distinguish "nothing similar enough" from "repo not indexed" so the
@@ -277,6 +293,9 @@ class Reviewer:
         """Run the Claude agent loop. Returns deduplicated warnings sorted by confidence."""
 
         dedup: dict[_DedupKey, Warning] = {}
+        # Best cosine similarity ever returned for each commit_sha during this
+        # review. Used to ground emit_warning's self-reported confidence.
+        observed_similarity: dict[str, float] = {}
 
         async def _progress(msg: str) -> None:
             logger.info("[reviewer] %s", msg)
@@ -334,13 +353,34 @@ class Reviewer:
                         inp = block.input
                         sha = inp["matched_commit_sha"]
                         matched = self._scar.get_by_sha(pr.repo, sha)
+                        model_confidence = float(inp["confidence"])
+                        # Ground the agent's self-reported confidence in the
+                        # cosine similarity we actually observed for this sha.
+                        # If the agent cited a sha we never returned (it found
+                        # the incident via get_incident_details after a search
+                        # on a different file, etc.), fall back to model-only.
+                        sim = observed_similarity.get(sha)
+                        if sim is not None:
+                            grounded = (
+                                _CONFIDENCE_MODEL_WEIGHT * model_confidence
+                                + _CONFIDENCE_SIMILARITY_WEIGHT * sim
+                            )
+                        else:
+                            grounded = model_confidence
+                            logger.info(
+                                "emit_warning sha=%s had no observed similarity; "
+                                "using model confidence as-is",
+                                sha[:12],
+                            )
+                        # Clamp into the schema range and round for clean display.
+                        grounded = max(0.0, min(1.0, grounded))
                         w = Warning(
                             pr_file=inp["pr_file"],
                             pr_hunk=inp["pr_hunk_header"],
                             matched_incident=matched,
                             severity=inp["severity"],
                             explanation=inp["explanation"],
-                            confidence=float(inp["confidence"]),
+                            confidence=round(grounded, 4),
                             proposed_fix=inp.get("proposed_fix"),
                         )
                         key: _DedupKey = (w.pr_file, w.pr_hunk, sha)
@@ -349,13 +389,22 @@ class Reviewer:
                             dedup[key] = w
                         if on_warning:
                             await on_warning(w)
-                        result: Any = {"ok": True, "warning_id": uuid.uuid4().hex[:8]}
+                        result: Any = {
+                            "ok": True,
+                            "warning_id": uuid.uuid4().hex[:8],
+                            "grounded_confidence": w.confidence,
+                            "model_confidence": model_confidence,
+                            "observed_similarity": sim,
+                        }
                     except Exception as exc:
                         logger.warning("emit_warning construction failed: %s", exc)
                         result = {"error": str(exc)}
                 else:
                     try:
-                        result = await self._exec_tool(pr, block.name, block.input)
+                        result = await self._exec_tool(
+                            pr, block.name, block.input,
+                            observed_similarity=observed_similarity,
+                        )
                     except Exception as exc:
                         logger.warning("Tool %s raised: %s", block.name, exc)
                         result = {"error": str(exc)}
