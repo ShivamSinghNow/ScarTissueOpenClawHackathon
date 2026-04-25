@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C ~/Desktop/langchain branch)",
+      "Bash(git *)",
+      "Bash(xxd)",
+      "Bash(curl -s http://localhost:8000/health)"
+    ]
+  }
+}

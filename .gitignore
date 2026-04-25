@@ -34,3 +34,4 @@ __pycache__/
 node_modules/
 .next/
 backend/demo_kit_langchain_small/
+backend/.env.bak

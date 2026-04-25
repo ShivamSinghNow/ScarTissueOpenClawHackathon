@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _sanitize_pr_url(v: str) -> str:
+    # GitHub PR URLs are pure ASCII. Drop any non-ASCII bytes (zero-width
+    # spaces, BOM, bidi marks, NBSP, etc.) that browsers paste in.
+    if not isinstance(v, str):
+        return v
+    return v.encode("ascii", errors="ignore").decode("ascii").strip()
 
 
 class Incident(BaseModel):
@@ -44,9 +52,16 @@ class IndexResponse(BaseModel):
 class PRReviewRequest(BaseModel):
     pr_url: str = Field(..., examples=["https://github.com/owner/repo/pull/123"])
 
+    @field_validator("pr_url", mode="before")
+    @classmethod
+    def strip_invisible(cls, v: str) -> str:
+        return _sanitize_pr_url(v)
+
 
 class ReviewResponse(BaseModel):
     pr_url: str
+    pr_repo: str
+    upstream_repo: Optional[str] = None  # set when pr_repo is a fork
     pr_title: str
     pr_author: str
     warnings: list[Warning]

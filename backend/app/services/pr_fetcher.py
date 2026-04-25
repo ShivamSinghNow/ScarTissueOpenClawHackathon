@@ -31,7 +31,7 @@ class Hunk:
 @dataclass
 class PRDiff:
     url: str
-    repo: str           # "owner/repo"
+    repo: str                       # "owner/repo" — the slug the PR URL points at
     number: int
     title: str
     author: str
@@ -39,7 +39,8 @@ class PRDiff:
     head_sha: str
     files_changed: list[str]
     hunks: list[Hunk]
-    raw_diff: str       # full unified diff
+    raw_diff: str                   # full unified diff
+    upstream_repo: str | None = None  # set when `repo` is a fork; the root ancestor
 
 
 class PRFetcher:
@@ -65,6 +66,14 @@ class PRFetcher:
         # Metadata via PyGithub
         gh_repo = self._gh.get_repo(repo_slug)
         pr = gh_repo.get_pull(number)
+
+        # If this repo is a fork, resolve to the root ancestor so scar-tissue
+        # lookups hit the upstream's index instead of the (un-indexed) fork.
+        upstream_repo: str | None = None
+        if gh_repo.fork:
+            root = gh_repo.source or gh_repo.parent
+            if root is not None and root.full_name.lower() != repo_slug.lower():
+                upstream_repo = root.full_name
 
         # Unified diff via REST API with vnd.github.v3.diff
         diff_url = f"https://api.github.com/repos/{repo_slug}/pulls/{number}"
@@ -95,6 +104,7 @@ class PRFetcher:
             files_changed=files_changed,
             hunks=hunks,
             raw_diff=raw_diff,
+            upstream_repo=upstream_repo,
         )
 
 

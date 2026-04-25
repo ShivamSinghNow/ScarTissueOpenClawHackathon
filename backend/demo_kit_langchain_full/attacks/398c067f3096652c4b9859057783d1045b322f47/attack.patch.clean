@@ -1,0 +1,356 @@
+--- a/libs/core/langchain_core/tools/base.py
++++ b/libs/core/langchain_core/tools/base.py
+@@ -672,7 +672,6 @@
+             TypeError: If `args_schema` is not a Pydantic `BaseModel` or dict.
+         """
+         input_args = self.args_schema
+-
+         if isinstance(tool_input, str):
+             if input_args is not None:
+                 if isinstance(input_args, dict):
+@@ -690,7 +689,6 @@
+                     msg = f"args_schema must be a Pydantic BaseModel, got {input_args}"
+                     raise TypeError(msg)
+             return tool_input
+-
+         if input_args is not None:
+             if isinstance(input_args, dict):
+                 return tool_input
+@@ -731,30 +729,10 @@
+                     f"args_schema must be a Pydantic BaseModel, got {self.args_schema}"
+                 )
+                 raise NotImplementedError(msg)
+-
+-            # Include fields from tool_input, plus fields with explicit defaults.
+-            # This applies Pydantic defaults (like Field(default=1)) while excluding
+-            # synthetic "args"/"kwargs" fields that Pydantic creates for *args/**kwargs.
+-            field_info = get_fields(input_args)
+-            validated_input = {}
+-            for k in result_dict:
+-                if k in tool_input:
+-                    # Field was provided in input - include it (validated)
+-                    validated_input[k] = getattr(result, k)
+-                elif k in field_info and k not in {"args", "kwargs"}:
+-                    # Check if field has an explicit default defined in the schema.
+-                    # Exclude "args"/"kwargs" as these are synthetic fields for variadic
+-                    # parameters that should not be passed as keyword arguments.
+-                    fi = field_info[k]
+-                    # Pydantic v2 uses is_required() method, v1 uses required attribute
+-                    has_default = (
+-                        not fi.is_required()
+-                        if hasattr(fi, "is_required")
+-                        else not getattr(fi, "required", True)
+-                    )
+-                    if has_default:
+-                        validated_input[k] = getattr(result, k)
+-
++            # Simplify the validation logic - only include fields that were in the original input
++            validated_input = {
++                k: getattr(result, k) for k in result_dict if k in tool_input
++            }
+             for k in self._injected_args_keys:
+                 if k in tool_input:
+                     validated_input[k] = tool_input[k]
+@@ -769,9 +747,7 @@
+                         )
+                         raise ValueError(msg)
+                     validated_input[k] = tool_call_id
+-
+             return validated_input
+-
+         return tool_input
+ 
+     @abstractmethod
+@@ -1303,291 +1279,4 @@
+     )
+ 
+ 
+-def _is_message_content_block(obj: Any) -> bool:
+-    """Check if object is a valid message content block.
+-
+-    Validates content blocks for OpenAI or Anthropic format.
+-
+-    Args:
+-        obj: The object to check.
+-
+-    Returns:
+-        `True` if the object is a valid content block, `False` otherwise.
+-    """
+-    if isinstance(obj, str):
+-        return True
+-    if isinstance(obj, dict):
+-        return obj.get("type", None) in TOOL_MESSAGE_BLOCK_TYPES
+-    return False
+-
+-
+-def _stringify(content: Any) -> str:
+-    """Convert content to string, preferring JSON format.
+-
+-    Args:
+-        content: The content to stringify.
+-
+-    Returns:
+-        String representation of the content.
+-    """
+-    try:
+-        return json.dumps(content, ensure_ascii=False)
+-    except Exception:
+-        return str(content)
+-
+-
+-def _get_type_hints(func: Callable) -> dict[str, type] | None:
+-    """Get type hints from a function, handling partial functions.
+-
+-    Args:
+-        func: The function to get type hints from.
+-
+-    Returns:
+-        `dict` of type hints, or `None` if extraction fails.
+-    """
+-    if isinstance(func, functools.partial):
+-        func = func.func
+-    try:
+-        return get_type_hints(func)
+-    except Exception:
+-        return None
+-
+-
+-def _get_runnable_config_param(func: Callable) -> str | None:
+-    """Find the parameter name for `RunnableConfig` in a function.
+-
+-    Args:
+-        func: The function to check.
+-
+-    Returns:
+-        The parameter name for `RunnableConfig`, or `None` if not found.
+-    """
+-    type_hints = _get_type_hints(func)
+-    if not type_hints:
+-        return None
+-    for name, type_ in type_hints.items():
+-        if type_ is RunnableConfig:
+-            return name
+-    return None
+-
+-
+-class InjectedToolArg:
+-    """Annotation for tool arguments that are injected at runtime.
+-
+-    Tool arguments annotated with this class are not included in the tool
+-    schema sent to language models and are instead injected during execution.
+-    """
+-
+-
+-class _DirectlyInjectedToolArg:
+-    """Annotation for tool arguments that are injected at runtime.
+-
+-    Injected via direct type annotation, rather than annotated metadata.
+-
+-    For example, `ToolRuntime` is a directly injected argument.
+-
+-    Note the direct annotation rather than the verbose alternative:
+-    `Annotated[ToolRuntime, InjectedRuntime]`
+-
+-    ```python
+-    from langchain_core.tools import tool, ToolRuntime
+-
+-
+-    @tool
+-    def foo(x: int, runtime: ToolRuntime) -> str:
+-        # use runtime.state, runtime.context, runtime.store, etc.
+-        ...
+-    ```
+-    """
+-
+-
+-class InjectedToolCallId(InjectedToolArg):
+-    """Annotation for injecting the tool call ID.
+-
+-    This annotation is used to mark a tool parameter that should receive the tool call
+-    ID at runtime.
+-
+-    ```python
+-    from typing import Annotated
+-    from langchain_core.messages import ToolMessage
+-    from langchain_core.tools import tool, InjectedToolCallId
+-
+-    @tool
+-    def foo(
+-        x: int, tool_call_id: Annotated[str, InjectedToolCallId]
+-    ) -> ToolMessage:
+-        \"\"\"Return x.\"\"\"
+-        return ToolMessage(
+-            str(x),
+-            artifact=x,
+-            name="foo",
+-            tool_call_id=tool_call_id
+-        )
+-    ```
+-    """
+-
+-
+-def _is_directly_injected_arg_type(type_: Any) -> bool:
+-    """Check if a type annotation indicates a directly injected argument.
+-
+-    This is currently only used for `ToolRuntime`.
+-
+-    Checks if either the annotation itself is a subclass of `_DirectlyInjectedToolArg`
+-    or the origin of the annotation is a subclass of `_DirectlyInjectedToolArg`.
+-
+-    For example, `ToolRuntime` or `ToolRuntime[ContextT, StateT]` would both return
+-    `True`.
+-    """
+-    return (
+-        isinstance(type_, type) and issubclass(type_, _DirectlyInjectedToolArg)
+-    ) or (
+-        (origin := get_origin(type_)) is not None
+-        and isinstance(origin, type)
+-        and issubclass(origin, _DirectlyInjectedToolArg)
+-    )
+-
+-
+-def _is_injected_arg_type(
+-    type_: type | TypeVar, injected_type: type[InjectedToolArg] | None = None
+-) -> bool:
+-    """Check if a type annotation indicates an injected argument.
+-
+-    Args:
+-        type_: The type annotation to check.
+-        injected_type: The specific injected type to check for.
+-
+-    Returns:
+-        `True` if the type is an injected argument, `False` otherwise.
+-    """
+-    if injected_type is None:
+-        # if no injected type is specified,
+-        # check if the type is a directly injected argument
+-        if _is_directly_injected_arg_type(type_):
+-            return True
+-        injected_type = InjectedToolArg
+-
+-    # if the type is an Annotated type, check if annotated metadata
+-    # is an intance or subclass of the injected type
+-    return any(
+-        isinstance(arg, injected_type)
+-        or (isinstance(arg, type) and issubclass(arg, injected_type))
+-        for arg in get_args(type_)[1:]
+-    )
+-
+-
+-def get_all_basemodel_annotations(
+-    cls: TypeBaseModel | Any, *, default_to_bound: bool = True
+-) -> dict[str, type | TypeVar]:
+-    """Get all annotations from a Pydantic `BaseModel` and its parents.
+-
+-    Args:
+-        cls: The Pydantic `BaseModel` class.
+-        default_to_bound: Whether to default to the bound of a `TypeVar` if it exists.
+-
+-    Returns:
+-        `dict` of field names to their type annotations.
+-    """
+-    # cls has no subscript: cls = FooBar
+-    if isinstance(cls, type):
+-        fields = get_fields(cls)
+-        alias_map = {field.alias: name for name, field in fields.items() if field.alias}
+-
+-        annotations: dict[str, type | TypeVar] = {}
+-        for name, param in inspect.signature(cls).parameters.items():
+-            # Exclude hidden init args added by pydantic Config. For example if
+-            # BaseModel(extra="allow") then "extra_data" will part of init sig.
+-            if name not in fields and name not in alias_map:
+-                continue
+-            field_name = alias_map.get(name, name)
+-            annotations[field_name] = param.annotation
+-        orig_bases: tuple = getattr(cls, "__orig_bases__", ())
+-    # cls has subscript: cls = FooBar[int]
+-    else:
+-        annotations = get_all_basemodel_annotations(
+-            get_origin(cls), default_to_bound=False
+-        )
+-        orig_bases = (cls,)
+-
+-    # Pydantic v2 automatically resolves inherited generics, Pydantic v1 does not.
+-    if not (isinstance(cls, type) and is_pydantic_v2_subclass(cls)):
+-        # if cls = FooBar inherits from Baz[str], orig_bases will contain Baz[str]
+-        # if cls = FooBar inherits from Baz, orig_bases will contain Baz
+-        # if cls = FooBar[int], orig_bases will contain FooBar[int]
+-        for parent in orig_bases:
+-            # if class = FooBar inherits from Baz, parent = Baz
+-            if isinstance(parent, type) and is_pydantic_v1_subclass(parent):
+-                annotations.update(
+-                    get_all_basemodel_annotations(parent, default_to_bound=False)
+-                )
+-                continue
+-
+-            parent_origin = get_origin(parent)
+-
+-            # if class = FooBar inherits from non-pydantic class
+-            if not parent_origin:
+-                continue
+-
+-            # if class = FooBar inherits from Baz[str]:
+-            # parent = class Baz[str],
+-            # parent_origin = class Baz,
+-            # generic_type_vars = (type vars in Baz)
+-            # generic_map = {type var in Baz: str}
+-            generic_type_vars: tuple = getattr(parent_origin, "__parameters__", ())
+-            generic_map = dict(zip(generic_type_vars, get_args(parent), strict=False))
+-            for field in getattr(parent_origin, "__annotations__", {}):
+-                annotations[field] = _replace_type_vars(
+-                    annotations[field], generic_map, default_to_bound=default_to_bound
+-                )
+-
+-    return {
+-        k: _replace_type_vars(v, default_to_bound=default_to_bound)
+-        for k, v in annotations.items()
+-    }
+-
+-
+-def _replace_type_vars(
+-    type_: type | TypeVar,
+-    generic_map: dict[TypeVar, type] | None = None,
+-    *,
+-    default_to_bound: bool = True,
+-) -> type | TypeVar:
+-    """Replace `TypeVar`s in a type annotation with concrete types.
+-
+-    Args:
+-        type_: The type annotation to process.
+-        generic_map: Mapping of `TypeVar`s to concrete types.
+-        default_to_bound: Whether to use `TypeVar` bounds as defaults.
+-
+-    Returns:
+-        The type with `TypeVar`s replaced.
+-    """
+-    generic_map = generic_map or {}
+-    if isinstance(type_, TypeVar):
+-        if type_ in generic_map:
+-            return generic_map[type_]
+-        if default_to_bound:
+-            return type_.__bound__ if type_.__bound__ is not None else Any
+-        return type_
+-    if (origin := get_origin(type_)) and (args := get_args(type_)):
+-        new_args = tuple(
+-            _replace_type_vars(arg, generic_map, default_to_bound=default_to_bound)
+-            for arg in args
+-        )
+-        return cast("type", _py_38_safe_origin(origin)[new_args])  # type: ignore[index]
+-    return type_
+-
+-
+-class BaseToolkit(BaseModel, ABC):
+-    """Base class for toolkits containing related tools.
+-
+-    A toolkit is a collection of related tools that can be used together to accomplish a
+-    specific task or work with a particular system.
+-    """
+-
+-    @abstractmethod
+-    def get_tools(self) -> list[BaseTool]:
+-        """Get all tools in the toolkit.
+-
+-        Returns:
+-            List of tools contained in this toolkit.
+-        """
++def _is_message_content_block(obj: Any) -> bool:

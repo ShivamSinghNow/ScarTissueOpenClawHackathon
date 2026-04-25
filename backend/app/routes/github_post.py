@@ -7,9 +7,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from github import Github, GithubException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from app.models.schemas import Warning
+from app.models.schemas import Warning, _sanitize_pr_url
 
 router = APIRouter()
 
@@ -18,6 +18,11 @@ class PostToGithubRequest(BaseModel):
     pr_url: str
     warnings: list[Warning]
     dry_run: bool = False
+
+    @field_validator("pr_url", mode="before")
+    @classmethod
+    def strip_invisible(cls, v: str) -> str:
+        return _sanitize_pr_url(v)
 
 
 class PostedComment(BaseModel):

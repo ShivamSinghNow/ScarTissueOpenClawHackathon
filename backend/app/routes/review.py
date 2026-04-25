@@ -28,6 +28,8 @@ async def review_pr(request: PRReviewRequest) -> ReviewResponse:
 
         return ReviewResponse(
             pr_url=request.pr_url,
+            pr_repo=pr.repo,
+            upstream_repo=pr.upstream_repo,
             pr_title=pr.title,
             pr_author=pr.author,
             warnings=warnings,

@@ -34,6 +34,8 @@ interface Warning {
 
 interface ReviewResponse {
   pr_url: string
+  pr_repo: string
+  upstream_repo: string | null
   pr_title: string
   pr_author: string
   warnings: Warning[]
@@ -1011,7 +1013,10 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
   }, [data.warnings])
 
   const groups = fileGroups()
-  const prRepo = repoFromPrUrl(data.pr_url)
+  // For forks, scar tissue is keyed by the upstream root, so check the upstream
+  // first and fall back to the literal PR repo (or URL parse for older payloads).
+  const prRepo = data.upstream_repo ?? data.pr_repo ?? repoFromPrUrl(data.pr_url)
+  const forkRepo = data.upstream_repo ? data.pr_repo : null
   const indexedRepo = prRepo ? indexedRepos.find(r => r.repo.toLowerCase() === prRepo.toLowerCase() && r.status === 'indexed') : undefined
   const indexingRepo = prRepo ? indexedRepos.find(r => r.repo.toLowerCase() === prRepo.toLowerCase() && r.status === 'indexing') : undefined
 
@@ -1135,10 +1140,17 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
                 <Icon name={indexedRepo ? 'check' : 'shieldAlert'} size={16} stroke={indexedRepo ? '#4faa6a' : '#d0a060'} strokeWidth={2}/>
                 {indexedRepo ? `No historical patterns matched. ${indexedRepo.incidents} prior incidents analyzed.` : 'No warnings returned.'}
               </div>
+              {indexedRepo && forkRepo && (
+                <div style={{ fontSize: 11, color: '#666' }}>
+                  PR is from fork {forkRepo} — analyzed against upstream {prRepo}.
+                </div>
+              )}
               {!indexedRepo && prRepo && (
                 <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 7, padding: '10px 12px', maxWidth: 390 }}>
                   <div style={{ fontSize: 12, color: '#d0a060', lineHeight: 1.5 }}>
-                    This repo hasn't been indexed yet. Index {prRepo} to get regression warnings on this PR.
+                    {forkRepo
+                      ? `Upstream ${prRepo} hasn't been indexed yet. Index it to get regression warnings on this PR from fork ${forkRepo}.`
+                      : `This repo hasn't been indexed yet. Index ${prRepo} to get regression warnings on this PR.`}
                   </div>
                   <button className="btn-primary" onClick={() => onIndexRepo(prRepo, 1000)} disabled={Boolean(indexingRepo)} style={{ marginTop: 9, padding: '7px 10px', fontSize: 11.5, opacity: indexingRepo ? .55 : 1, cursor: indexingRepo ? 'not-allowed' : 'pointer' }}>
                     {indexingRepo ? 'Indexing...' : 'Index this repo'}
