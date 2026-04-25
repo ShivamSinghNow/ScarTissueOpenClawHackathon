@@ -197,7 +197,18 @@ class Reviewer:
         self, pr: PRDiff, name: str, inp: dict[str, Any]
     ) -> Any:
         if name == "search_scar_tissue":
-            hits = self._scar.search(repo=pr.repo, query=inp["query"], top_k=5)
+            # Bias retrieval toward historical commits that touched the same
+            # path the PR is editing. Without this, retrieval is pure cosine
+            # over commit message + diff text and surfaces unrelated fixes
+            # whose phrasing happens to overlap.
+            pr_file = inp.get("pr_file")
+            pr_files = [pr_file] if pr_file else None
+            hits = self._scar.search(
+                repo=pr.repo,
+                query=inp["query"],
+                top_k=5,
+                pr_files=pr_files,
+            )
             return [
                 {
                     "commit_sha": inc.commit_sha,

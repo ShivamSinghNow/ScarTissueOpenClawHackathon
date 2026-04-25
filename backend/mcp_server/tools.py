@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 import time
 from contextlib import contextmanager, redirect_stdout
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-import chromadb
 from mcp import types
 from mcp.server import Server
 
@@ -137,13 +135,6 @@ def _error_result(tool_name: str, exc: Exception) -> types.CallToolResult:
     )
 
 
-def _best_effort_repo_name(collection_name: str) -> str:
-    if "_" not in collection_name:
-        return collection_name
-    owner, repo_tail = collection_name.split("_", 1)
-    return f"{owner}/{repo_tail}"
-
-
 async def _handle_index_repo(args: dict[str, Any], services: ToolServices) -> types.CallToolResult:
     repo = args["repo"]
     max_commits = int(args.get("max_commits", 3000))
@@ -212,22 +203,7 @@ async def _handle_list_indexed_repos(
     _args: dict[str, Any], services: ToolServices
 ) -> types.CallToolResult:
     try:
-        persist_dir = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db")
-        client = chromadb.PersistentClient(path=persist_dir)
-        repos: list[dict[str, Any]] = []
-        for collection in client.list_collections():
-            best_effort_repo = _best_effort_repo_name(collection.name)
-            stats = services.scar_index.collection_stats(best_effort_repo)
-            repos.append(
-                {
-                    "repo": best_effort_repo,
-                    "incidents": stats["count"],
-                    "last_indexed": stats["last_indexed"],
-                }
-            )
-
-        repos.sort(key=lambda item: item["repo"])
-        return _json_text_result({"repos": repos})
+        return _json_text_result({"repos": services.scar_index.list_repos()})
     except Exception as exc:
         return _error_result(LIST_INDEXED_REPOS_TOOL.name, exc)
 

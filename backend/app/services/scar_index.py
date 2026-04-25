@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Optional
 
 import chromadb
@@ -12,6 +13,15 @@ from app.models.schemas import Incident
 
 _MODEL_NAME = "all-MiniLM-L6-v2"
 _MAX_QUERY_CHARS = 8_000
+
+# Re-rank widening: pull this many candidates from cosine, then re-score with
+# path-overlap before returning the requested top_k.
+_RERANK_MULTIPLIER = 4
+
+# Path-overlap re-rank weights (added on top of cosine similarity in [0, 1]).
+_PATH_BOOST_EXACT = 0.30      # historical commit touched the exact PR file
+_PATH_BOOST_DIRECTORY = 0.15  # same directory
+_PATH_BOOST_BASENAME = 0.10   # same filename in a different directory
 
 
 def _build_embedding_text(incident: Incident) -> str:
@@ -23,6 +33,39 @@ def _build_embedding_text(incident: Incident) -> str:
 
 def _collection_name(repo: str) -> str:
     return repo.replace("/", "_").replace("-", "_").lower()
+
+
+def _path_overlap_boost(historical_files: list[str], pr_files: list[str]) -> float:
+    """Return the largest path-overlap boost between any pr_file and any historical_file."""
+    if not historical_files or not pr_files:
+        return 0.0
+
+    pr_paths = [PurePosixPath(p) for p in pr_files]
+    hist_paths = [PurePosixPath(p) for p in historical_files]
+
+    best = 0.0
+    for pr in pr_paths:
+        for hist in hist_paths:
+            if hist == pr:
+                return _PATH_BOOST_EXACT
+            if hist.parent == pr.parent and hist.parent.parts:
+                best = max(best, _PATH_BOOST_DIRECTORY)
+            if hist.name == pr.name and hist.name:
+                best = max(best, _PATH_BOOST_BASENAME)
+    return best
+
+
+def _flat_metadata(incident: Incident, repo: str) -> dict:
+    """Per-record metadata that Chroma can filter on without unpacking the JSON blob."""
+    return {
+        "repo": repo,
+        "commit_sha": incident.commit_sha,
+        "files": " | ".join(incident.files_changed[:20]),
+        "author": incident.author,
+        "year": incident.commit_date.year,
+        "commit_date_iso": incident.commit_date.isoformat(),
+        "incident_json": incident.model_dump_json(),
+    }
 
 
 class ScarIndex:
@@ -54,8 +97,7 @@ class ScarIndex:
             texts = [_build_embedding_text(inc) for inc in batch]
             embeddings = self._model.encode(texts, show_progress_bar=False).tolist()
             ids = [inc.commit_sha for inc in batch]
-            metadatas = [{"incident_json": inc.model_dump_json()} for inc in batch]
-            # document text is used for display only; real data lives in metadata
+            metadatas = [_flat_metadata(inc, repo) for inc in batch]
             documents = [inc.commit_message.splitlines()[0][:200] for inc in batch]
 
             col.upsert(
@@ -71,9 +113,10 @@ class ScarIndex:
             # Strip immutable hnsw:* keys — chromadb rejects modify() if they're present
             mutable = {k: v for k, v in (col.metadata or {}).items() if not k.startswith("hnsw:")}
             mutable["last_indexed"] = datetime.now(tz=timezone.utc).isoformat()
+            mutable["repo"] = repo  # canonical original name, for lossless decode
             col.modify(metadata=mutable)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[scar_index] Warning: could not update collection metadata: {exc}")
 
         return total
 
@@ -82,8 +125,14 @@ class ScarIndex:
         repo: str,
         query: str,
         top_k: int = 5,
+        pr_files: list[str] | None = None,
     ) -> list[tuple[Incident, float]]:
-        """Returns (incident, similarity_score) sorted by relevance."""
+        """Returns (incident, blended_score) sorted by relevance.
+
+        When pr_files is given, results are re-ranked so historical commits
+        touching paths that overlap with the PR's files float above otherwise
+        equally-similar generic matches.
+        """
         try:
             col = self._client.get_collection(name=_collection_name(repo))
         except Exception:
@@ -96,27 +145,38 @@ class ScarIndex:
         if len(query) > _MAX_QUERY_CHARS:
             query = query[:_MAX_QUERY_CHARS]
 
+        # Pull a wider candidate set so re-ranking has room to work.
+        widened_k = min(top_k * _RERANK_MULTIPLIER, count) if pr_files else min(top_k, count)
+
         embedding = self._model.encode([query], show_progress_bar=False).tolist()
         results = col.query(
             query_embeddings=embedding,
-            n_results=min(top_k, count),
+            n_results=widened_k,
             include=["metadatas", "distances"],
         )
 
         if not results["ids"] or not results["ids"][0]:
             return []
 
-        out: list[tuple[Incident, float]] = []
+        scored: list[tuple[Incident, float, float]] = []  # (incident, cosine_sim, blended)
         for meta, dist in zip(results["metadatas"][0], results["distances"][0]):
             try:
                 incident = Incident.model_validate_json(meta["incident_json"])
                 # chromadb cosine space: distance = 1 - cosine_similarity
                 similarity = 1.0 - dist
-                out.append((incident, similarity))
+                if pr_files:
+                    boost = _path_overlap_boost(incident.files_changed, pr_files)
+                    blended = similarity + boost
+                else:
+                    blended = similarity
+                scored.append((incident, similarity, blended))
             except Exception:
                 continue
 
-        return out
+        scored.sort(key=lambda t: t[2], reverse=True)
+        # Return cosine similarity (not blended) so callers can compare to
+        # absolute thresholds without having to subtract the boost.
+        return [(inc, sim) for inc, sim, _blended in scored[:top_k]]
 
     def get_by_sha(self, repo: str, commit_sha: str) -> Incident | None:
         try:
@@ -133,15 +193,52 @@ class ScarIndex:
             return None
 
     def collection_stats(self, repo: str) -> dict:
-        """Returns {'name': str, 'count': int, 'last_indexed': iso_string | None}"""
+        """Returns {'name': str, 'count': int, 'last_indexed': iso_string | None, 'repo': str}"""
         name = _collection_name(repo)
         try:
             col = self._client.get_collection(name=name)
             count = col.count()
-            last_indexed = (col.metadata or {}).get("last_indexed")
-            return {"name": name, "count": count, "last_indexed": last_indexed}
+            metadata = col.metadata or {}
+            last_indexed = metadata.get("last_indexed")
+            canonical_repo = metadata.get("repo") or repo
+            return {
+                "name": name,
+                "count": count,
+                "last_indexed": last_indexed,
+                "repo": canonical_repo,
+            }
         except Exception:
-            return {"name": name, "count": 0, "last_indexed": None}
+            return {"name": name, "count": 0, "last_indexed": None, "repo": repo}
+
+    def list_repos(self) -> list[dict]:
+        """List every indexed collection with its canonical repo name and stats.
+
+        Reads the canonical 'owner/name' from the collection metadata (set at
+        index time) so we don't have to guess at the slash position from the
+        underscored collection name.
+        """
+        out: list[dict] = []
+        for col in self._client.list_collections():
+            metadata = col.metadata or {}
+            repo = metadata.get("repo")
+            if not repo:
+                # Fall back to reading one record's metadata
+                try:
+                    sample = col.get(limit=1, include=["metadatas"])
+                    if sample["metadatas"]:
+                        repo = sample["metadatas"][0].get("repo")
+                except Exception:
+                    repo = None
+            if not repo:
+                # Last resort: collection name verbatim (lossy but better than guessing)
+                repo = col.name
+            out.append({
+                "repo": repo,
+                "incidents": col.count(),
+                "last_indexed": metadata.get("last_indexed"),
+            })
+        out.sort(key=lambda r: r["repo"])
+        return out
 
 
 if __name__ == "__main__":
