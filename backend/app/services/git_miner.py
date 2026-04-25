@@ -96,15 +96,19 @@ class GitMiner:
 
             parent = commit.parents[0]
 
-            # Fast line-count check before pulling the full diff
+            # Fast line-count check before pulling the full diff. _count_changed_lines
+            # returns -1 on error so we skip rather than fall through with n_lines=0
+            # and silently index a commit whose real diff is far above the cap.
             n_lines = self._count_changed_lines(git_repo, parent, commit)
-            if n_lines > _MAX_DIFF_LINES:
+            if n_lines < 0 or n_lines > _MAX_DIFF_LINES:
                 continue
 
             diff_text = self._get_diff(git_repo, parent, commit)
 
-            # Skip commits with empty diffs (force-push edge case)
-            if not diff_text.strip():
+            # Skip empty diffs (force-push edge case) and skip commits whose
+            # diff extraction failed — _get_diff returns None on failure so we
+            # don't index error strings as if they were real fix diffs.
+            if diff_text is None or not diff_text.strip():
                 continue
 
             try:
@@ -187,7 +191,11 @@ class GitMiner:
     def _count_changed_lines(
         self, repo: git.Repo, parent: git.Commit, commit: git.Commit
     ) -> int:
-        """Return total insertions+deletions via --numstat (fast, no diff body)."""
+        """Return total insertions+deletions via --numstat (fast, no diff body).
+
+        Returns -1 if the count could not be obtained, so callers can skip the
+        commit instead of treating "unknown" as "zero" and bypassing size caps.
+        """
         try:
             numstat = repo.git.diff(parent.hexsha, commit.hexsha, "--numstat")
             total = 0
@@ -199,13 +207,18 @@ class GitMiner:
                     except ValueError:
                         pass
             return total
-        except Exception:
-            return 0
+        except Exception as exc:
+            print(f"[miner] numstat failed for {commit.hexsha[:12]}: {exc}")
+            return -1
 
     def _get_diff(
         self, repo: git.Repo, parent: git.Commit, commit: git.Commit
-    ) -> str:
+    ) -> str | None:
         """Return the unified diff as a UTF-8 string, truncated if needed.
+
+        Returns None when extraction fails so the caller can skip the commit.
+        Previously this returned an "[error getting diff: …]" string that then
+        got embedded as if it were a real fix.
 
         Uses subprocess so that binary-content and encoding edge cases are
         handled by explicit decode(errors='replace') rather than GitPython's
@@ -219,7 +232,8 @@ class GitMiner:
             )
             raw = result.stdout.decode("utf-8", errors="replace")
         except Exception as exc:
-            return f"[error getting diff: {exc}]"
+            print(f"[miner] diff failed for {commit.hexsha[:12]}: {exc}")
+            return None
 
         # Mark binary file lines legibly
         lines: list[str] = []
