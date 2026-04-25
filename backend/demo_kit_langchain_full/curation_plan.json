@@ -1,0 +1,122 @@
+[
+  {
+    "commit_sha": "bc21045ee054b233aa6c4f65653b26a0a7ff340f",
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "One-line fix prevents silent data corruption by adding a shallow copy before in-place mutations\u2014classic Python gotcha that breaks caller expectations.",
+    "changed_lines": 1
+  },
+  {
+    "commit_sha": "2d4f00a45130f62c1b994ff03c032f308d79456e",
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Batching logic ignored OpenAI's 300k token limit, sending 673k tokens and exploding with 400 errors on large document sets\u2014math fail meets API reality.",
+    "changed_lines": 126
+  },
+  {
+    "commit_sha": "63673b765b7deffcd116ba8f3833a7ff8a2ac8d2",
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "retry/idempotency issue",
+    "visceral": true,
+    "juicy_reason": "Retry decorator was commented out, so `max_retries` parameter silently did nothing\u2014users thought they had resilience but got instant failures.",
+    "changed_lines": 89
+  },
+  {
+    "commit_sha": "2bc982b73c58d8dac8f77a7e3bc339a6cf672685",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Multi-turn reasoning agents silently lost their chain-of-thought because serialization forgot to write `reasoning_content` back to `thinking`.",
+    "changed_lines": 141
+  },
+  {
+    "commit_sha": "2b6911d9af58ba5a03b9c7102ab47c8aeee70c16",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Conversation summarization orphaned tool responses from their AI message parents, breaking the call-response chain agents rely on.",
+    "changed_lines": 80
+  },
+  {
+    "commit_sha": "ca7790f8951abce1296f69cd29e63cec5af50b1d",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Callback manager merge was cross-contaminating handler lists because add_handler() polluted both buckets when inherit=True\u2014classic list-mixing footgun.",
+    "changed_lines": 32
+  },
+  {
+    "commit_sha": "294dda8df27fda136b9e5c9aa413a9036a7cfadb",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Named colors like 'white' got prefixed with '!' but never URL-encoded, causing mermaid.ink API to 400\u2014classic forgot-to-escape bug.",
+    "changed_lines": 44
+  },
+  {
+    "commit_sha": "e99ccbc126d29aff40269024b2bebb8bab68715e",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Mermaid diagram generation was completely broken because '!' in '!white' wasn't URL-encoded, causing 400 errors from the API.",
+    "changed_lines": 5
+  },
+  {
+    "commit_sha": "398c067f3096652c4b9859057783d1045b322f47",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Default parameter values from Pydantic schemas were ignored, forcing callers to manually pass defaults every time.",
+    "changed_lines": 151
+  },
+  {
+    "commit_sha": "d84eef667af9bd2480b5c50852dad0b393f40c29",
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Modern LLM providers switched from `function_call` to `tool_calls` and the code was still checking the deprecated field, silently losing tool invocation data.",
+    "changed_lines": 79
+  }
+]

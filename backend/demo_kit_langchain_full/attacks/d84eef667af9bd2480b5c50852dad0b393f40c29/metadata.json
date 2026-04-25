@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "d84eef667af9bd2480b5c50852dad0b393f40c29",
+  "commit_message": "fix(core): use tool_calls instead of deprecated function_call in get_buffer_string (#34355)\n\n## Summary\n\nFixes #33970\n\n`get_buffer_string` was only checking for the deprecated `function_call`\nfield in `additional_kwargs`, which modern LLM providers no longer\nreturn. This fix updates the function to check for the modern\n`tool_calls` field first, falling back to `function_call` for legacy\ncompatibility.\n\n## Changes\n\n- Check `AIMessage.tool_calls` first (modern standard)\n- Fall back to `additional_kwargs[\"function_call\"]` (legacy support)\n- Added 3 unit tests covering tool_calls, empty content, and precedence\nbehavior\n\n## Testing\n\n```python\n# Before fix: tool_calls info was lost\nmsg = AIMessage(content=\"Hi\", tool_calls=[{\"name\": \"search\", ...}])\nget_buffer_string([msg])  # \"AI: Hi\" (no tool info)\n\n# After fix: tool_calls are included\nget_buffer_string([msg])  # \"AI: Hi[{\\\"name\\\": \\\"search\\\", ...}]\"\n```\n\n- All existing `get_buffer_string` tests pass\n- Legacy `function_call` behavior preserved\n\n---\n\n> [!NOTE]\n> This PR was developed with AI agent assistance (Factory/Droid).\n\n---------\n\nCo-authored-by: Mason Daugherty <github@mdrxy.com>",
+  "target_file": "libs/core/langchain_core/messages/utils.py",
+  "why_this_is_juicy": "Modern LLM providers switched from `function_call` to `tool_calls` and the code was still checking the deprecated field, silently losing tool invocation data.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Modern LLM providers switched from `function_call` to `tool_calls` and the code was still checking the deprecated field, silently losing tool invocation data.",
+    "changed_lines": 79
+  }
+}

@@ -1,0 +1,1 @@
+refactor(core): simplify get_buffer_string message formatting

@@ -1,0 +1,3 @@
+⚠️ **ScarTissue Alert: Regression Risk Detected (commit 63673b765b7deffcd116ba8f3833a7ff8a2ac8d2)**
+
+This PR reintroduces a critical bug previously fixed in commit 63673b765b7d: it disables the retry logic in `ChatMistralAI.completion_with_retry` by removing the retry decorator. While the `max_retries` parameter will still be accepted by the class constructor, it will have no effect—API calls will fail immediately on transient errors instead of retrying as users expect. This silently breaks the resilience contract: applications that rely on `max_retries` for fault tolerance will experience unexpected failures in production without any error indicating the parameter is non-functional.

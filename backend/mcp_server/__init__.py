@@ -1,0 +1,1 @@
+"""ScarTissue MCP server package."""

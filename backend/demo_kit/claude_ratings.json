@@ -1,0 +1,1262 @@
+{
+  "19b0805bc1489a0e9ea04609256199932d6d8389": {
+    "commit_sha": "19b0805bc1489a0e9ea04609256199932d6d8389",
+    "clarity_score": 8,
+    "bug_type": "streaming glitch",
+    "visceral": true,
+    "juicy_reason": "OpenAI started randomly sending dicts instead of proper Response objects in streams, breaking production chat flows until this defensive coercion wrapper caught them."
+  },
+  "8fec4e7ceee2c368b068c49f9fed453276e210e7": {
+    "commit_sha": "8fec4e7ceee2c368b068c49f9fed453276e210e7",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Azure chat profiles weren't falling back to model_name when deployment_name was missing, causing silent config failures in multi-deployment setups."
+  },
+  "ae0743ec3b0428bd3aaac66b067b2e437b2dca36": {
+    "commit_sha": "ae0743ec3b0428bd3aaac66b067b2e437b2dca36",
+    "clarity_score": 6,
+    "bug_type": "streaming glitch",
+    "visceral": false,
+    "juicy_reason": "Anthropic's compaction blocks leaked null encrypted_content fields that choked downstream serializers, now stripped before they escape."
+  },
+  "a029c7bf1da2e2ddcf2d99db7acd2e9c63b29ffa": {
+    "commit_sha": "a029c7bf1da2e2ddcf2d99db7acd2e9c63b29ffa",
+    "clarity_score": 9,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Users could inject full URLs into repo_id fields, bypassing HuggingFace auth and potentially triggering SSRF attacks against internal services."
+  },
+  "c289bf10e940e960a132d7403482283114063063": {
+    "commit_sha": "c289bf10e940e960a132d7403482283114063063",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "HTML splitter's URL fetcher had no SSRF protection, letting attackers probe internal networks by passing malicious URLs to split_text_from_url."
+  },
+  "b7447c6969fc928ec3f29c200e2e56c0a46c4c77": {
+    "commit_sha": "b7447c6969fc928ec3f29c200e2e56c0a46c4c77",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Min-version CI runs were failing on serdes tests due to version skew, now skipped to unblock releases without fixing the root incompatibility."
+  },
+  "0516156ef98f5001129f6d47bc8682d6536d58fb": {
+    "commit_sha": "0516156ef98f5001129f6d47bc8682d6536d58fb",
+    "clarity_score": 8,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Image token counting was making raw HTTP calls that could hit cloud metadata endpoints and leak credentials\u2014now uses SSRF-safe transport with blocked IPs."
+  },
+  "338aa8131a8124e7aa1e042616ccd2366ff9f699": {
+    "commit_sha": "338aa8131a8124e7aa1e042616ccd2366ff9f699",
+    "clarity_score": 9,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "SSRF protection was missing AWS EKS Pod Identity Agent and OpenStack metadata IPs, leaving credential endpoints exposed to malicious requests."
+  },
+  "aa33b06deb0d65489ce254b48a8aaf8a86304c18": {
+    "commit_sha": "aa33b06deb0d65489ce254b48a8aaf8a86304c18",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Just silencing mypy warnings in legacy code\u2014no actual runtime bug fixed."
+  },
+  "f2d3a2f6e2e6cc0144dc7a3c05d753a9ba8a2f35": {
+    "commit_sha": "f2d3a2f6e2e6cc0144dc7a3c05d753a9ba8a2f35",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "CI was failing on every partner PR because CodSpeed expected benchmarks that don't exist\u2014now checks for benchmark directory first."
+  },
+  "311675a517f51ec6c77454124293c58df517e952": {
+    "commit_sha": "311675a517f51ec6c77454124293c58df517e952",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Reverted a test skip\u2014someone changed their mind about excluding serdes tests from min-version checks."
+  },
+  "d647311ecf71b4c680739304b95cbe4f9e5b87d1": {
+    "commit_sha": "d647311ecf71b4c680739304b95cbe4f9e5b87d1",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Skipping serdes tests during min-version release checks because they were presumably flaky or incompatible."
+  },
+  "885f2c2c2d7027f5601d1be016eb454418e83aa3": {
+    "commit_sha": "885f2c2c2d7027f5601d1be016eb454418e83aa3",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Conditional logic replaced with simpler type-key check, fixing malformed reasoning blocks."
+  },
+  "a6eb82970166a8fb966f1eb04238e6c378811bcc": {
+    "commit_sha": "a6eb82970166a8fb966f1eb04238e6c378811bcc",
+    "clarity_score": 9,
+    "bug_type": "memory leak",
+    "visceral": true,
+    "juicy_reason": "Nested subgraph invocations leaked entire RunTree hierarchies forever because external runs never got cleaned from run_map."
+  },
+  "af2ed47c6f008cdd551f3c0d87db3774c8dfe258": {
+    "commit_sha": "af2ed47c6f008cdd551f3c0d87db3774c8dfe258",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Added sanitization to templates but diff shows only imports and docstrings\u2014actual fix logic is hidden."
+  },
+  "7629c747260cbaed7ca55466d5b9e1b520a7de77": {
+    "commit_sha": "7629c747260cbaed7ca55466d5b9e1b520a7de77",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Symlinks bypassed file extension validation, letting attackers save prompts as arbitrary file types."
+  },
+  "3beba77e2e23d498fda07f9b8d6ba00aabfaf69f": {
+    "commit_sha": "3beba77e2e23d498fda07f9b8d6ba00aabfaf69f",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "ChatOllama crashed on `response_format` because it expected `format` instead\u2014simple parameter translation fix."
+  },
+  "2bc982b73c58d8dac8f77a7e3bc339a6cf672685": {
+    "commit_sha": "2bc982b73c58d8dac8f77a7e3bc339a6cf672685",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Multi-turn reasoning agents silently lost their chain-of-thought because serialization forgot to write `thinking` back to Ollama."
+  },
+  "bc21045ee054b233aa6c4f65653b26a0a7ff340f": {
+    "commit_sha": "bc21045ee054b233aa6c4f65653b26a0a7ff340f",
+    "clarity_score": 10,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "One-line fix prevents silent data corruption by adding a shallow copy before in-place mutations\u2014classic Python gotcha that breaks caller expectations."
+  },
+  "e71e6564b18316fc7b946c9c9d71b0f910baa6b7": {
+    "commit_sha": "e71e6564b18316fc7b946c9c9d71b0f910baa6b7",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Feature addition, not a bug fix\u2014adds missing `dimensions` parameter to match Ollama API capabilities."
+  },
+  "050b779d97d4c72dfea1c46bfc12b1049be3ab63": {
+    "commit_sha": "050b779d97d4c72dfea1c46bfc12b1049be3ab63",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Fixes URL parsing to handle scheme-less endpoints like `ollama:11434`, preventing connection failures from malformed URLs."
+  },
+  "0aa482d0cd82f798b2e5557da86301549e5b98d8": {
+    "commit_sha": "0aa482d0cd82f798b2e5557da86301549e5b98d8",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Feature addition exposing logprobs from Ollama SDK, not fixing existing broken behavior."
+  },
+  "62bc87492c998c1a116e0eb188422f374a40f63f": {
+    "commit_sha": "62bc87492c998c1a116e0eb188422f374a40f63f",
+    "clarity_score": 0,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Dependency version bump in CI workflow\u2014zero bug-fix content, pure maintenance chore."
+  },
+  "ebecdddb1b40ef0e8da7f36baa07b4a67c331623": {
+    "commit_sha": "ebecdddb1b40ef0e8da7f36baa07b4a67c331623",
+    "clarity_score": 9,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Blocks SSRF attacks by validating Bedrock model deserialization, preventing malicious payloads from hijacking endpoint URLs."
+  },
+  "deb85b6c4ccba4a41f1b71a500880ace13f0b5a5": {
+    "commit_sha": "deb85b6c4ccba4a41f1b71a500880ace13f0b5a5",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "VCR cassettes redacted URIs to **REDACTED** but still tried to match on them\u2014every playback failed silently."
+  },
+  "8c15649127b3714b2b8f1903968163db70e6b90c": {
+    "commit_sha": "8c15649127b3714b2b8f1903968163db70e6b90c",
+    "clarity_score": 10,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Python's `or` treated `total_tokens=0` as falsy, silently replacing legitimate zero-token responses with computed fallbacks."
+  },
+  "d1529dd0bcd3a95bbfcd784eb8f11b3afb70f922": {
+    "commit_sha": "d1529dd0bcd3a95bbfcd784eb8f11b3afb70f922",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Docstring example used wrong parameter names\u2014copy-paste error, no runtime impact."
+  },
+  "0b5f2c08ee256473e368372a803c5c92039c0a4e": {
+    "commit_sha": "0b5f2c08ee256473e368372a803c5c92039c0a4e",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Symlink named `exploit.txt` pointing to a Python file bypassed the `.txt` suffix check before path resolution."
+  },
+  "c9f51aef85e02fbaadcd5c6c37cf4ef01a49f86e": {
+    "commit_sha": "c9f51aef85e02fbaadcd5c6c37cf4ef01a49f86e",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Fixed typos like \"whats\" \u2192 \"what's\" in test strings\u2014pure cosmetic cleanup."
+  },
+  "64bbcef37e7733f7029f57af644635bddad8e30a": {
+    "commit_sha": "64bbcef37e7733f7029f57af644635bddad8e30a",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Updated test to use new model name and tool schema\u2014test maintenance, not a bug fix."
+  },
+  "e6c1b29e8060074815de13474b3b6a21a37204e1": {
+    "commit_sha": "e6c1b29e8060074815de13474b3b6a21a37204e1",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Missing enum value breaks tool registration\u2014clean one-liner fix to allowlist."
+  },
+  "feb992abfe01c28a669980dad022c5eed58e878d": {
+    "commit_sha": "feb992abfe01c28a669980dad022c5eed58e878d",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Dict merge order silently clobbers user headers\u2014swap two lines, ship it."
+  },
+  "59933928837d017ab20a2c61d7b49d8e9d9ac50d": {
+    "commit_sha": "59933928837d017ab20a2c61d7b49d8e9d9ac50d",
+    "clarity_score": 7,
+    "bug_type": "off-by-one",
+    "visceral": false,
+    "juicy_reason": "Recursion limit of 10,000 hits internal ceiling at 10k\u2014drop to 9,999 to avoid silent failure."
+  },
+  "eb28ae1b20a0f101898a5e02025c447d1a33e4e5": {
+    "commit_sha": "eb28ae1b20a0f101898a5e02025c447d1a33e4e5",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Empty dicts vanish into the void\u2014`if isinstance(data, dict)` swallows `{}`, add truthiness check."
+  },
+  "aba72f7229d297617957e57f7df6be566f818676": {
+    "commit_sha": "aba72f7229d297617957e57f7df6be566f818676",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Local endpoints hammer HuggingFace API on every call\u2014gate metadata fetch behind URL check."
+  },
+  "4d9842da67cbb4f6a8482dd7069fc6c0093748e6": {
+    "commit_sha": "4d9842da67cbb4f6a8482dd7069fc6c0093748e6",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "SDK renames `x_title` to `x_open_router_title` across versions\u2014move to httpx headers for stability."
+  },
+  "7bb9443e1549daaf5096783b3ecc7c4e16b07f13": {
+    "commit_sha": "7bb9443e1549daaf5096783b3ecc7c4e16b07f13",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Build tooling path fix\u2014purely infra, no runtime impact, not demo-worthy."
+  },
+  "389f7ad1bc15123b8b901e61d0a1785b0a14815f": {
+    "commit_sha": "389f7ad1bc15123b8b901e61d0a1785b0a14815f",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Revert commit with no context on what broke\u2014mystery meat, not a satisfying fix story."
+  },
+  "475408fa620996e1958d18a0789ed5bf9fdee054": {
+    "commit_sha": "475408fa620996e1958d18a0789ed5bf9fdee054",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "ChatAnthropicVertex silently miscounted tokens because string match was too strict\u2014classic prefix bug with real impact."
+  },
+  "89cd0caa54d541e33ae87224c8e277bcbb026020": {
+    "commit_sha": "89cd0caa54d541e33ae87224c8e277bcbb026020",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Typo fix ('setup' \u2192 'set up')\u2014grammatically correct but utterly uninteresting for a demo."
+  },
+  "27add913474e01e33bededf4096151130ba0d47c": {
+    "commit_sha": "27add913474e01e33bededf4096151130ba0d47c",
+    "clarity_score": 8,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Unvalidated file paths in prompt save/load could enable directory traversal attacks\u2014security hole patched with deprecation."
+  },
+  "ad574fce0d52740c249b0db7bde871d779ffb93d": {
+    "commit_sha": "ad574fce0d52740c249b0db7bde871d779ffb93d",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Dependency version bump to match core changes\u2014necessary but boring maintenance work."
+  },
+  "5ffece5c033365baf4a3df52ffed5c6bfbed27ee": {
+    "commit_sha": "5ffece5c033365baf4a3df52ffed5c6bfbed27ee",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Removing dead allowlist code\u2014no runtime impact, just housekeeping."
+  },
+  "900f8a3513c9b4cd5d5b739d9f573d2fb0663db5": {
+    "commit_sha": "900f8a3513c9b4cd5d5b739d9f573d2fb0663db5",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Missing `phase` field extraction broke OpenAI responses API parameter support."
+  },
+  "7d05cfb131f23c6e925f3361091bc430f2c73e2c": {
+    "commit_sha": "7d05cfb131f23c6e925f3361091bc430f2c73e2c",
+    "clarity_score": 7,
+    "bug_type": "streaming glitch",
+    "visceral": true,
+    "juicy_reason": "Streaming function_call chunks silently dropped the `namespace` field, corrupting tool invocations mid-stream."
+  },
+  "491eb9d1afde8792f878b76713f7bf0bf81215b1": {
+    "commit_sha": "491eb9d1afde8792f878b76713f7bf0bf81215b1",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Swapped deprecated Azure AI class names to fix instantiation failures."
+  },
+  "70c88c0e723a5d9477d13f4b6ba8893e40b76f50": {
+    "commit_sha": "70c88c0e723a5d9477d13f4b6ba8893e40b76f50",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Invocation params weren't reaching trace metadata, breaking observability."
+  },
+  "cf1f510d7742e68be1718a4034225eeb14da171b": {
+    "commit_sha": "cf1f510d7742e68be1718a4034225eeb14da171b",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Module import crash killed external PR labeling, silently disabling issue-link enforcement for all community contributions."
+  },
+  "abcc7d68c13de1182f424f39db1c8564a756d934": {
+    "commit_sha": "abcc7d68c13de1182f424f39db1c8564a756d934",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "CVE security vulnerability in image processing library\u2014out-of-bounds write when loading PSD files could crash demos or worse."
+  },
+  "eff9210496e5e3b7c43ae45846e5b83de8256972": {
+    "commit_sha": "eff9210496e5e3b7c43ae45846e5b83de8256972",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Missing export breaks imports\u2014users couldn't access Runtime class from the middleware module."
+  },
+  "32db24222794b558d31390da8b77869996d3bdc4": {
+    "commit_sha": "32db24222794b558d31390da8b77869996d3bdc4",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Bash-ism in Makefile caused daily CI failures on Ubuntu runners using dash shell instead of bash."
+  },
+  "9e4a6013bec2913fd5ac75988e0d1e266c5323bd": {
+    "commit_sha": "9e4a6013bec2913fd5ac75988e0d1e266c5323bd",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Missing 'type: message' field in OpenAI Responses API requests\u2014likely caused validation errors or unexpected behavior."
+  },
+  "6d6d7191cf288a13ade58d4b7e427ccc3d29d13b": {
+    "commit_sha": "6d6d7191cf288a13ade58d4b7e427ccc3d29d13b",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Double-counting token usage in Anthropic cache metrics\u2014billing and usage dashboards would show inflated numbers."
+  },
+  "b1f2d9c0fb74fc3fc2113c140e251e4222f30acb": {
+    "commit_sha": "b1f2d9c0fb74fc3fc2113c140e251e4222f30acb",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Trivial linting fix removing a noqa comment\u2014zero functional impact."
+  },
+  "b676167707b9c8e27feef7e58a11edb0fe011703": {
+    "commit_sha": "b676167707b9c8e27feef7e58a11edb0fe011703",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Clean API ergonomics fix\u2014users can now use the intuitive `base_url` parameter instead of the cryptic `api_base`."
+  },
+  "9521c679db9641912b97297d434adc8d000b5a9c": {
+    "commit_sha": "9521c679db9641912b97297d434adc8d000b5a9c",
+    "clarity_score": 9,
+    "bug_type": "memory leak",
+    "visceral": true,
+    "juicy_reason": "Classic file descriptor leak\u2014PIL Image handles left open will slowly strangle your process until it can't open any more files."
+  },
+  "92be5b62b0d3d9116527be92bb1a23e76ae82755": {
+    "commit_sha": "92be5b62b0d3d9116527be92bb1a23e76ae82755",
+    "clarity_score": 7,
+    "bug_type": "streaming glitch",
+    "visceral": false,
+    "juicy_reason": "Missing field in allowlist broke Anthropic's eager input streaming feature\u2014one-line whitelist addition restores functionality."
+  },
+  "f9dbd22fe18184c8f929ab933f36215b2940037f": {
+    "commit_sha": "f9dbd22fe18184c8f929ab933f36215b2940037f",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Typo fix in a comment\u2014zero runtime impact, pure cosmetic cleanup."
+  },
+  "fcca6e2dc473e2cd8942a7dc7c3424b918f8405c": {
+    "commit_sha": "fcca6e2dc473e2cd8942a7dc7c3424b918f8405c",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Dependency version bump to ensure compatibility\u2014prevents mysterious failures from using outdated core library."
+  },
+  "3af0bc01417d946710a2ed5b2b513c08c4577870": {
+    "commit_sha": "3af0bc01417d946710a2ed5b2b513c08c4577870",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Model detection logic was too narrow\u2014new GPT-5 pro variants and codex models were falling through to wrong API endpoint."
+  },
+  "f838c787885ba6350ee75c0d4bba4e7a4d19355c": {
+    "commit_sha": "f838c787885ba6350ee75c0d4bba4e7a4d19355c",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Removed extra backticks in a deprecation warning string\u2014pure cosmetic polish."
+  },
+  "b21c0a8062b5cc7e9e4b3d652091ef50c5a24d5c": {
+    "commit_sha": "b21c0a8062b5cc7e9e4b3d652091ef50c5a24d5c",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Forgot to copy default_factory when cloning Pydantic fields, breaking tool schemas that rely on factories."
+  },
+  "46fdade7e68b0532529d5ac65d907bc1873c1af7": {
+    "commit_sha": "46fdade7e68b0532529d5ac65d907bc1873c1af7",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Custom PII detectors returned {\"text\":...} but downstream code expected {\"value\":...}, causing KeyError crashes in production redaction."
+  },
+  "f11a1050233b3c816ff1d3e9f82c3f0434ce1bc5": {
+    "commit_sha": "f11a1050233b3c816ff1d3e9f82c3f0434ce1bc5",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Called a module-level function instead of instance method, likely breaking subclass overrides or state access."
+  },
+  "0bc831495ca20024373a4c83a7ce8ce444d941a2": {
+    "commit_sha": "0bc831495ca20024373a4c83a7ce8ce444d941a2",
+    "clarity_score": 10,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "ReDoS vulnerability (CVE-2024-58340): catastrophic backtracking in agent action regex could freeze the entire service with a crafted prompt."
+  },
+  "86aaa8ab15ce34a9c5371e170acf59e59c812171": {
+    "commit_sha": "86aaa8ab15ce34a9c5371e170acf59e59c812171",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Dependency version bumps\u2014no actual bug fix, just routine maintenance."
+  },
+  "7a4cc3ec321c4ded3681b57456df365936139333": {
+    "commit_sha": "7a4cc3ec321c4ded3681b57456df365936139333",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Import reorganization for test expectations\u2014no actual runtime bug fixed."
+  },
+  "f698b43b9af456949f96998f6a99c9289880a815": {
+    "commit_sha": "f698b43b9af456949f96998f6a99c9289880a815",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Serializing arbitrary Pydantic models from structured output crashed with PydanticSerializationUnexpectedValue\u2014now excludes the toxic `parsed` field."
+  },
+  "fb31c91076192859dd1632aa93bf25820db3c2ed": {
+    "commit_sha": "fb31c91076192859dd1632aa93bf25820db3c2ed",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Anthropic API rejects forced tool_choice when thinking mode is on\u2014now drops the conflicting parameter with a warning."
+  },
+  "c8f394208bfbda2025b00dd1ba9f44ad5c55ca0a": {
+    "commit_sha": "c8f394208bfbda2025b00dd1ba9f44ad5c55ca0a",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Stripping `role` before `model_construct` caused KeyError on older SDK versions that don't auto-populate defaults."
+  },
+  "61fd90a2f32e217856702c9aad90a074dd4f2e51": {
+    "commit_sha": "61fd90a2f32e217856702c9aad90a074dd4f2e51",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Usage metadata vanished from tracer runs because extractor read the wrong serialized path after a refactor."
+  },
+  "d2c86df128004aa0d601503f8be98bcc6f933fbb": {
+    "commit_sha": "d2c86df128004aa0d601503f8be98bcc6f933fbb",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Swapped test provider because sambanova doesn't support tool_choice:any\u2014test infra fix, not a product bug."
+  },
+  "ac9295761a673b21bd1ec2f151fd1168e60a3d53": {
+    "commit_sha": "ac9295761a673b21bd1ec2f151fd1168e60a3d53",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Provider routing changed upstream in huggingface-hub 1.x, breaking test fixtures that assumed old model-to-provider mappings."
+  },
+  "6d39b7289200bc9fe6ec9d6cecc56b484da7594b": {
+    "commit_sha": "6d39b7289200bc9fe6ec9d6cecc56b484da7594b",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Dependency hell: transformers 4.x banned hub 1.x while langchain allowed it, causing CI to explode when uv force-reinstalled mismatched versions."
+  },
+  "af15037a4c853538ddb5b82cf61f3d8f2399c9a6": {
+    "commit_sha": "af15037a4c853538ddb5b82cf61f3d8f2399c9a6",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "CPython 3.13.12 introduced a segfault in CodSpeed's walltime profiler, nuking all benchmarks with exit 139 despite tests passing."
+  },
+  "633596823763c9b9088da26fa4b989be6a50f5e4": {
+    "commit_sha": "633596823763c9b9088da26fa4b989be6a50f5e4",
+    "clarity_score": 10,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Substring check for Azure endpoint could be bypassed with evil-azure.com or example.com/azure.com, allowing attacker-controlled API routing."
+  },
+  "e939c96792f6478bd940794c99d2d819067d0899": {
+    "commit_sha": "e939c96792f6478bd940794c99d2d819067d0899",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Fixed typo in docstring: 'compation' \u2192 'compaction'."
+  },
+  "c600b932a637a7fd29d593140b49b6eda7d8ae93": {
+    "commit_sha": "c600b932a637a7fd29d593140b49b6eda7d8ae93",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Added CSV test coverage and accommodated breaking changes in OpenAI file URL input handling."
+  },
+  "78678534f970a5a01dddfc979594367c58d04b44": {
+    "commit_sha": "78678534f970a5a01dddfc979594367c58d04b44",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Empty string IDs were treated as valid, causing tool chunks with blank IDs to fail merging when they should've been treated as missing."
+  },
+  "cdb9742511d57b8eb3d37f93d115ae9b4d60dba4": {
+    "commit_sha": "cdb9742511d57b8eb3d37f93d115ae9b4d60dba4",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "OpenAI-specific block types like 'reasoning' and 'function_call' leaked into Anthropic messages, causing format mismatches."
+  },
+  "2d1492a8643ec260e998f64001784249f7da80cf": {
+    "commit_sha": "2d1492a8643ec260e998f64001784249f7da80cf",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Better error message for non-serializable tool schemas\u2014helpful but not a runtime bug fix, just improved diagnostics."
+  },
+  "d6e46bb4b0813bdfe1f6670380b45ead550636c6": {
+    "commit_sha": "d6e46bb4b0813bdfe1f6670380b45ead550636c6",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Using *args in callback overrides caused IndexError when fallback converted messages to strings\u2014subtle signature footgun."
+  },
+  "2fa460d325d0500069232a2f27be0c40f95c9f28": {
+    "commit_sha": "2fa460d325d0500069232a2f27be0c40f95c9f28",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Just updated test cassettes (binary fixtures)\u2014no actual code bug fixed, pure test maintenance."
+  },
+  "ca246ddef20ea343e539c8cf7739a7cd9e9229ea": {
+    "commit_sha": "ca246ddef20ea343e539c8cf7739a7cd9e9229ea",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Swapped retired Anthropic model IDs to fix failing tests\u2014config update, not a logic bug."
+  },
+  "070c23410435d2d42c7f3019070cddae47f29464": {
+    "commit_sha": "070c23410435d2d42c7f3019070cddae47f29464",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Missing provider mapping meant Anthropic Bedrock users got cryptic import errors instead of their chat model."
+  },
+  "03826061be61202f9e1dacb1acad043b957763e1": {
+    "commit_sha": "03826061be61202f9e1dacb1acad043b957763e1",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Azure-hosted DeepSeek choked on dict-form tool_choice, needed string 'required' instead."
+  },
+  "5362bf5666356a97d7efb9e3d9ba3cffbf52cc1d": {
+    "commit_sha": "5362bf5666356a97d7efb9e3d9ba3cffbf52cc1d",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Anthropic's 1M context beta header was ignored, causing token limit rejections on massive prompts."
+  },
+  "4af87fd0255cc97b5dfbd5408e5a2df5d0174de5": {
+    "commit_sha": "4af87fd0255cc97b5dfbd5408e5a2df5d0174de5",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Regex ate closing braces while adding trailing commas, breaking every generated profile file."
+  },
+  "6a6ef8caad2025451d27b52e5e9124a5f575e766": {
+    "commit_sha": "6a6ef8caad2025451d27b52e5e9124a5f575e766",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Removed unnecessary noqa comments\u2014pure linter hygiene, zero runtime impact."
+  },
+  "83f81d65af659200afa6beede40f46fafff7e85e": {
+    "commit_sha": "83f81d65af659200afa6beede40f46fafff7e85e",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Gemini 3 models were blocked from using tools with structured output despite supporting it."
+  },
+  "5c6f8fe0a63442e594c7ea0c996e37c3de6def65": {
+    "commit_sha": "5c6f8fe0a63442e594c7ea0c996e37c3de6def65",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Falsy values like empty strings or zero silently vanished because walrus operator treated them as False\u2014classic Python footgun."
+  },
+  "5053436dcfe531edd1619862f74c07c61fd57801": {
+    "commit_sha": "5053436dcfe531edd1619862f74c07c61fd57801",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Parallel tool calls with same index but different IDs got incorrectly merged, corrupting multi-tool responses."
+  },
+  "3686bcbd966ff1ef13e5fdbde28aa0e630ddd5c4": {
+    "commit_sha": "3686bcbd966ff1ef13e5fdbde28aa0e630ddd5c4",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "LangSmith tracing crashed when temperature was integer (like 1) instead of float (1.0)\u2014overly strict type check."
+  },
+  "9c160e2368f7f44bd41e967a7b3371208cf13a52": {
+    "commit_sha": "9c160e2368f7f44bd41e967a7b3371208cf13a52",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Reverted the integer temperature fix\u2014presumably broke something downstream, classic rollback drama."
+  },
+  "a9f3627229ce3c27e0046730e91e3a7e670b88a4": {
+    "commit_sha": "a9f3627229ce3c27e0046730e91e3a7e670b88a4",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Re-applied integer temperature fix after revert\u2014they figured out the real issue and brought it back."
+  },
+  "8951c01fe8b0c6cec28e3ef82d150a17fcf9f4d7": {
+    "commit_sha": "8951c01fe8b0c6cec28e3ef82d150a17fcf9f4d7",
+    "clarity_score": 9,
+    "bug_type": "memory leak",
+    "visceral": true,
+    "juicy_reason": "Separator list grew unboundedly on every split_text() call\u2014mutating self instead of using local copy, textbook memory leak."
+  },
+  "b0041037213ea9fde193d339c6cc654f6b2a25c4": {
+    "commit_sha": "b0041037213ea9fde193d339c6cc654f6b2a25c4",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Documentation-only fix correcting a docstring that incorrectly claimed the function preserves text 'between' tags when it actually removes everything inside them."
+  },
+  "a565cf85eb6792d8d0848224a2a2c3d5bdf97eee": {
+    "commit_sha": "a565cf85eb6792d8d0848224a2a2c3d5bdf97eee",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Infinite recursion bomb defused by checking if args_schema is a dict before treating it like a Pydantic model\u2014classic type confusion crash."
+  },
+  "ba3ad67328fdfc5f093e6d08465890d05d483c28": {
+    "commit_sha": "ba3ad67328fdfc5f093e6d08465890d05d483c28",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Merging streaming chunks was accidentally summing timestamps and indices, creating hilariously wrong temporal values and tool call identifiers."
+  },
+  "f7dbdab5bad857ecc35a45ecefb85c4aa929b681": {
+    "commit_sha": "f7dbdab5bad857ecc35a45ecefb85c4aa929b681",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Pure documentation cleanup fixing misleading docstrings and updating outdated URLs\u2014no runtime behavior changed."
+  },
+  "32c6ab30332ff45d6bdb5ef63879faef1de38048": {
+    "commit_sha": "32c6ab30332ff45d6bdb5ef63879faef1de38048",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Added missing `model` property alias to match expected interface\u2014minor API completeness fix without drama."
+  },
+  "4150bb513fbe5c9cda14446fc8db88af2d92fec5": {
+    "commit_sha": "4150bb513fbe5c9cda14446fc8db88af2d92fec5",
+    "clarity_score": 5,
+    "bug_type": "retry/idempotency issue",
+    "visceral": false,
+    "juicy_reason": "Test was checking wrong HTTP status code (400 instead of 429) for rate-limit retry logic validation."
+  },
+  "68a14844b52fcdceec1b311bff9a3e014ae7f6b1": {
+    "commit_sha": "68a14844b52fcdceec1b311bff9a3e014ae7f6b1",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Security CVE fix bumping Pillow version\u2014critical but not viscerally broken code."
+  },
+  "6a07b3acdadf3ef16ffa9d7b9dc25f73388cd5f8": {
+    "commit_sha": "6a07b3acdadf3ef16ffa9d7b9dc25f73388cd5f8",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Documentation fix correcting misleading security comment\u2014no actual runtime bug."
+  },
+  "0f5a314275497eabe98b2646d43d6cb9815d9168": {
+    "commit_sha": "0f5a314275497eabe98b2646d43d6cb9815d9168",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Model profile data correction (gpt-4.1-nano \u2192 gpt-4o-2024-11-20)\u2014config typo fix."
+  },
+  "cdbe6c34f97415bcc182a130e02d18e3f678fd15": {
+    "commit_sha": "cdbe6c34f97415bcc182a130e02d18e3f678fd15",
+    "clarity_score": 8,
+    "bug_type": "retry/idempotency issue",
+    "visceral": true,
+    "juicy_reason": "Retry logic was blindly retrying all exceptions instead of just transient errors\u2014classic retry antipattern."
+  },
+  "c1e7cf69fb06adb93f72fb6d01d2477b2b9f5afc": {
+    "commit_sha": "c1e7cf69fb06adb93f72fb6d01d2477b2b9f5afc",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Enhanced error message for non-OpenAI providers\u2014UX improvement, not a runtime bug fix."
+  },
+  "8e359240830486cab1c525b574c51489b7324d43": {
+    "commit_sha": "8e359240830486cab1c525b574c51489b7324d43",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Sanitizes chat content blocks to strip extra keys\u2014prevents API rejections from malformed payloads."
+  },
+  "ecac3d891c2a4224cc031e9fbee3c13c3a0cc312": {
+    "commit_sha": "ecac3d891c2a4224cc031e9fbee3c13c3a0cc312",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Enhanced error message for null choices from OpenAI-compatible APIs\u2014helpful but not dramatic."
+  },
+  "9a2a10ec212ac00b8d5f77506bab264407a5b69e": {
+    "commit_sha": "9a2a10ec212ac00b8d5f77506bab264407a5b69e",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "GitHub releases silently stopped working for 3 weeks because a skipped job broke the dependency chain\u2014sneaky CI logic bug."
+  },
+  "1493b4c5eed3b6c08358a5ce5d890bc8b52b4874": {
+    "commit_sha": "1493b4c5eed3b6c08358a5ce5d890bc8b52b4874",
+    "clarity_score": 9,
+    "bug_type": "auth failure",
+    "visceral": true,
+    "juicy_reason": "Classic SSRF vulnerability letting attackers hit internal services via URL splitting\u2014security hole with real exploit potential."
+  },
+  "16cabfa212782d03b00e08658fb3e74160a1dd45": {
+    "commit_sha": "16cabfa212782d03b00e08658fb3e74160a1dd45",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Fixed text extraction logic from chat message content blocks\u2014mundane data parsing fix."
+  },
+  "19ddd42891514aba6d2c92cd32a915e7bb4b7b31": {
+    "commit_sha": "19ddd42891514aba6d2c92cd32a915e7bb4b7b31",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Uninitialized client silently returned empty generator, surfacing later as cryptic 'No data received' error\u2014classic delayed failure that wastes debugging time."
+  },
+  "d41dedae978dfd4e4ee82d57fc1f0c530d827b90": {
+    "commit_sha": "d41dedae978dfd4e4ee82d57fc1f0c530d827b90",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Added validation to catch mismatched weights/retrievers length\u2014prevents silent misconfiguration but not thrilling."
+  },
+  "5e8a2c53096bb9b7ba22cd1e6650e0b728618d1f": {
+    "commit_sha": "5e8a2c53096bb9b7ba22cd1e6650e0b728618d1f",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Moving `Sequence` out of TYPE_CHECKING block prevents NameError when Python tries to resolve type hints at runtime\u2014classic import guard gotcha."
+  },
+  "7f3c10865ac8e6026a2fcabd2e4f78f7740e8413": {
+    "commit_sha": "7f3c10865ac8e6026a2fcabd2e4f78f7740e8413",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Anthropic's API silently rejects cache_control nested in tool_result content blocks, so hoisting it to the parent level fixes invisible cache misses."
+  },
+  "0493b276e0be31d4f48d9d0ba5fcbce7fdded38f": {
+    "commit_sha": "0493b276e0be31d4f48d9d0ba5fcbce7fdded38f",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Adding `effort=\"max\"` literal and removing beta headers aligns with Anthropic API changes\u2014straightforward API contract update."
+  },
+  "a5f22e7cb18a05ed057028797a7d0d79cd509b0d": {
+    "commit_sha": "a5f22e7cb18a05ed057028797a7d0d79cd509b0d",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Removes redundant ternary `if guess_type else None` inside an already-guarded block\u2014harmless code smell cleanup, not a runtime bug."
+  },
+  "97ee14c179f703473a6ec6ee24179ea756a5698f": {
+    "commit_sha": "97ee14c179f703473a6ec6ee24179ea756a5698f",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Bare `except:` swallows KeyboardInterrupt and SystemExit, making Ctrl+C fail during traceback formatting\u2014users couldn't kill hung processes."
+  },
+  "462acb77344339d825a48ebffbbbc374cad90642": {
+    "commit_sha": "462acb77344339d825a48ebffbbbc374cad90642",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Dependabot config refactor to separate directory groups\u2014pure CI hygiene, zero runtime impact."
+  },
+  "0040e1a8aa366a1aeff585661c17cafb4281aafe": {
+    "commit_sha": "0040e1a8aa366a1aeff585661c17cafb4281aafe",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Token counting exploded on partial message sequences because the approximate counter wasn't told to skip usage metadata scaling."
+  },
+  "06a7d079b05ac5db6a13564989befc91a7d7261b": {
+    "commit_sha": "06a7d079b05ac5db6a13564989befc91a7d7261b",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Codex models were silently failing because the API preference check only looked for 'gpt-5.2-pro' and missed 'codex' entirely."
+  },
+  "4276d31cb50212f816b6cc41f47cc1da438284c0": {
+    "commit_sha": "4276d31cb50212f816b6cc41f47cc1da438284c0",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Anthropic choked on trailing whitespace in the final assistant message, so now we rstrip() it before sending."
+  },
+  "d30e2b88db411689ac9ba19e190b8addada76f72": {
+    "commit_sha": "d30e2b88db411689ac9ba19e190b8addada76f72",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Renamed 'output_format' to 'output_config.format' to match Anthropic's actual API schema."
+  },
+  "81b4752419df992b65357fe544372743ab3de77a": {
+    "commit_sha": "81b4752419df992b65357fe544372743ab3de77a",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Middleware crashed with IndexError when passing raw Pydantic schemas because they weren't wrapped in AutoStrategy first."
+  },
+  "74b3344679bd2919bee0eb62e1702c9b9502ee53": {
+    "commit_sha": "74b3344679bd2919bee0eb62e1702c9b9502ee53",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Added support for Opus 4.6's adaptive reasoning mode and inference_geo parameter for data residency."
+  },
+  "a434f3aa08a3cd384db74b788260dae7084edf01": {
+    "commit_sha": "a434f3aa08a3cd384db74b788260dae7084edf01",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Re-enables the scaling feature that was just reverted, showing the team flip-flopped on whether to use usage metadata scaling."
+  },
+  "032d01dd0ff12d926b06b03122bef33f27101493": {
+    "commit_sha": "032d01dd0ff12d926b06b03122bef33f27101493",
+    "clarity_score": 8,
+    "bug_type": "off-by-one",
+    "visceral": true,
+    "juicy_reason": "Token count scaling was overshooting by 50% max, now capped at 25% to prevent wildly inflated estimates."
+  },
+  "9db00d3a6ef4b9541697079cb7f91f581eff8827": {
+    "commit_sha": "9db00d3a6ef4b9541697079cb7f91f581eff8827",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Reverts a premature optimization that compiled regex at module level, moving it back inline for safety."
+  },
+  "8e4c433541a0636aad3eb3b3fc4013075cb5fb0e": {
+    "commit_sha": "8e4c433541a0636aad3eb3b3fc4013075cb5fb0e",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Pure revert of a Makefile change that added a typing target\u2014no actual bug, just build tooling churn."
+  },
+  "5981ee142c87ceebd2de05ac7e311d8da05abbf7": {
+    "commit_sha": "5981ee142c87ceebd2de05ac7e311d8da05abbf7",
+    "clarity_score": 9,
+    "bug_type": "off-by-one",
+    "visceral": true,
+    "juicy_reason": "Unbounded scale_factor could multiply token counts to infinity; now clamped between 1.0x and 1.5x to prevent runaway estimates."
+  },
+  "643355fa2df2d6221a521aeb07c1e4ee3fb18df7": {
+    "commit_sha": "643355fa2df2d6221a521aeb07c1e4ee3fb18df7",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Reverts the usage metadata scaling feature that was causing issues, only to be re-added two commits later in a classic thrash."
+  },
+  "f720ad00ae90539cdb26152b13530f0e5164236d": {
+    "commit_sha": "f720ad00ae90539cdb26152b13530f0e5164236d",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Missing parameter caused token counting to ignore actual usage metadata from the model."
+  },
+  "d7e8bd6be13090b8bdd1aaba8423de73660225d7": {
+    "commit_sha": "d7e8bd6be13090b8bdd1aaba8423de73660225d7",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Claimed Python 3.14 support but dependency doesn't support it yet\u2014classic version mismatch."
+  },
+  "91bb474dbc7427728bc2296881c9f03d5bf029b5": {
+    "commit_sha": "91bb474dbc7427728bc2296881c9f03d5bf029b5",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "UnboundLocalError crash when no AI message exists\u2014variable referenced before assignment in edge case."
+  },
+  "16f2c7d13b0e021a1d89dfce6cc60fcee0ab3671": {
+    "commit_sha": "16f2c7d13b0e021a1d89dfce6cc60fcee0ab3671",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Placeholder replacement order bug: later placeholders could accidentally match inside earlier ones without reverse iteration."
+  },
+  "631ca011f41e25166d2e7388c3f6a5be4cdc948a": {
+    "commit_sha": "631ca011f41e25166d2e7388c3f6a5be4cdc948a",
+    "clarity_score": 9,
+    "bug_type": "race condition",
+    "visceral": true,
+    "juicy_reason": "Classic singleton race condition\u2014multiple threads could create duplicate instances without double-checked locking."
+  },
+  "7c288f16502c5a1423c80eec40eab70de052b068": {
+    "commit_sha": "7c288f16502c5a1423c80eec40eab70de052b068",
+    "clarity_score": 10,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Not a bug\u2014just docstring formatting fix for proper rendering in documentation."
+  },
+  "d189663b47455e4b8181f5944a89a5f15847e6ad": {
+    "commit_sha": "d189663b47455e4b8181f5944a89a5f15847e6ad",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Tool names were getting randomly regenerated on every call because the factory kept creating fresh ToolStrategy instances instead of reusing the original."
+  },
+  "ef067078b89ac1170a8f2fd54e9b9ef55571e548": {
+    "commit_sha": "ef067078b89ac1170a8f2fd54e9b9ef55571e548",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Documentation update for mustache template variable extraction with minimal code change shown."
+  },
+  "84864d77ed3b7eb54cb6474c7881f4396b1f4cc8": {
+    "commit_sha": "84864d77ed3b7eb54cb6474c7881f4396b1f4cc8",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Empty BaseModel annotations were being incorrectly filtered out when the fields dict was empty, breaking schema generation."
+  },
+  "488db577e2e2ba9b4d2c23df3b079f007356af05": {
+    "commit_sha": "488db577e2e2ba9b4d2c23df3b079f007356af05",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Fake chat model would crash with index error when trying to parrot back the last message from an empty list."
+  },
+  "f5252b438e57a7dc345101c7982dc58203bc09c1": {
+    "commit_sha": "f5252b438e57a7dc345101c7982dc58203bc09c1",
+    "clarity_score": 5,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Google docstring parser failed when functions had no arguments or only reserved arguments like run_manager."
+  },
+  "638c33f65dbfb38e1a8dd93a29a895f6b5dd8053": {
+    "commit_sha": "638c33f65dbfb38e1a8dd93a29a895f6b5dd8053",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Type annotation lied: Iterable promises one-time iteration but code needed Iterator for proper streaming block consumption."
+  },
+  "017c8e05ec7f300b9394c280a3f9c4b9fbd78ed1": {
+    "commit_sha": "017c8e05ec7f300b9394c280a3f9c4b9fbd78ed1",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Type annotation mismatch where generators were typed as Iterable instead of Iterator\u2014subtle but breaks type contracts."
+  },
+  "13e6327d3f05636df240b170e21cbcf9cbd2d667": {
+    "commit_sha": "13e6327d3f05636df240b170e21cbcf9cbd2d667",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Documentation typo fix ('suffix' \u2192 'prefix')\u2014not a runtime bug, just embarrassing docs."
+  },
+  "40048838067b1ed6db5fd147d25b4aa32acfa65e": {
+    "commit_sha": "40048838067b1ed6db5fd147d25b4aa32acfa65e",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Incomplete diff showing deprecation handling\u2014can't assess the actual bug without seeing the fix."
+  },
+  "6ff8436fb0963c51619bfd3cbff9ccab8d12a985": {
+    "commit_sha": "6ff8436fb0963c51619bfd3cbff9ccab8d12a985",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Crashes with cryptic KeyError when LLM hallucinates tool names\u2014now throws proper OutputParserException with available tools listed."
+  },
+  "666bb6fe5388cb29cd35919fd5397bde14eb770d": {
+    "commit_sha": "666bb6fe5388cb29cd35919fd5397bde14eb770d",
+    "clarity_score": 6,
+    "bug_type": "streaming glitch",
+    "visceral": true,
+    "juicy_reason": "API routing bug during streaming that silently sends requests to wrong endpoint\u2014classic integration failure."
+  },
+  "f0ca2c4675099a99b98ade38c24dc4dcbf011c05": {
+    "commit_sha": "f0ca2c4675099a99b98ade38c24dc4dcbf011c05",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Typo in comment ('use a a' \u2192 'use as a')\u2014not even a code bug, just sloppy proofreading."
+  },
+  "72333ad64400ecaee26159e253e26f5cd92243da": {
+    "commit_sha": "72333ad64400ecaee26159e253e26f5cd92243da",
+    "clarity_score": 9,
+    "bug_type": "async bug",
+    "visceral": true,
+    "juicy_reason": "Sync invoke was blocking the event loop in an async test\u2014classic footgun that makes your whole test suite hang."
+  },
+  "eff21c75fc37cfe8cefe0432d04983b45f8b3913": {
+    "commit_sha": "eff21c75fc37cfe8cefe0432d04983b45f8b3913",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Just a typo fix in an error message\u2014zero runtime impact, pure cosmetics."
+  },
+  "a725c913084f0c457437fe0b7b98f6f195f8aec9": {
+    "commit_sha": "a725c913084f0c457437fe0b7b98f6f195f8aec9",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Broken markdown link in docs\u2014annoying for contributors but not a code bug."
+  },
+  "2fdae7a38a59d1869d65363a77428f0cd266e105": {
+    "commit_sha": "2fdae7a38a59d1869d65363a77428f0cd266e105",
+    "clarity_score": 1,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Extra asterisk in markdown heading\u2014pure formatting noise, zero functional impact."
+  },
+  "cb09f94e82b9b1567c16891212d5293c989b3365": {
+    "commit_sha": "cb09f94e82b9b1567c16891212d5293c989b3365",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Typo in test docstring ('seperator' \u2192 'separator')\u2014doesn't affect test execution at all."
+  },
+  "608d8cf99ec476d4c7438b2594da75555de2862c": {
+    "commit_sha": "608d8cf99ec476d4c7438b2594da75555de2862c",
+    "clarity_score": 2,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Grammar fixes in PR template\u2014helpful for clarity but not a code defect."
+  },
+  "a1df299123cf6bf7ad35e93f944b8e9d30201da1": {
+    "commit_sha": "a1df299123cf6bf7ad35e93f944b8e9d30201da1",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Trailing whitespace in LLM prompts can cause subtle model behavior changes\u2014invisible characters breaking AI responses is peak 2024."
+  },
+  "1d7a2690a2e9e5756dda6efd600bd217b168c239": {
+    "commit_sha": "1d7a2690a2e9e5756dda6efd600bd217b168c239",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Dev literally had an aneurysm reading the mangled grammar in the system prompt\u2014when your AI's instructions need their own AI to parse."
+  },
+  "9b8c211f981e37b97c7b9635f124bf36e5e8b8cf": {
+    "commit_sha": "9b8c211f981e37b97c7b9635f124bf36e5e8b8cf",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Model alias went stale and tests broke\u2014classic case of external API deprecation catching you off guard."
+  },
+  "7e40de78003d3985c192ca0ba1d7f3537bd6cabd": {
+    "commit_sha": "7e40de78003d3985c192ca0ba1d7f3537bd6cabd",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Python 3.10 tests silently passing when package requires 3.11+\u2014CI matrix misconfiguration hiding incompatibility."
+  },
+  "ca00e4fed9c0d8a44f6dc7821d01176a7796ae35": {
+    "commit_sha": "ca00e4fed9c0d8a44f6dc7821d01176a7796ae35",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Method signature mismatch between interface and implementation\u2014unused parameter renamed breaking the contract."
+  },
+  "09c3c52fd0551cd2b534f7949c7bcf30704efd57": {
+    "commit_sha": "09c3c52fd0551cd2b534f7949c7bcf30704efd57",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Missing metadata tag meant CLI couldn't detect summarization calls\u2014users staring at frozen terminal with no 'Currently summarizing...' status."
+  },
+  "ee6fce5586fe0d5cf38ec162d172afaf491f2782": {
+    "commit_sha": "ee6fce5586fe0d5cf38ec162d172afaf491f2782",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Reverted metadata tests\u2014no actual bug fix visible, just cleanup."
+  },
+  "331d57b42964a8641e9ea9a8e6c5db5e524aeb3a": {
+    "commit_sha": "331d57b42964a8641e9ea9a8e6c5db5e524aeb3a",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Removed duplicate label configs causing GitHub Actions conflicts\u2014clean infra fix."
+  },
+  "d4663be53d1009409481b7cb575bfc1dc3d0aa96": {
+    "commit_sha": "d4663be53d1009409481b7cb575bfc1dc3d0aa96",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Stopped PR labeler from re-running on every edit\u2014only triggers on actual code changes now."
+  },
+  "3289ee20edd3c688f1b79d8293a90951cbc19493": {
+    "commit_sha": "3289ee20edd3c688f1b79d8293a90951cbc19493",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Fixed extraction of thinking/reasoning blocks as text\u2014now correctly skips non-text block types from Gemini 3."
+  },
+  "381f0a397124c6e27615e6edde635ecf1c24187e": {
+    "commit_sha": "381f0a397124c6e27615e6edde635ecf1c24187e",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Deleted obsolete test files after code moved to langchain-community\u2014just cleanup."
+  },
+  "34e867e92ba451edd1ab19e0842bd9f6d22f7b9e": {
+    "commit_sha": "34e867e92ba451edd1ab19e0842bd9f6d22f7b9e",
+    "clarity_score": 6,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Made `tags` parameter explicit in sync callback methods for better IDE autocomplete\u2014minor DX improvement."
+  },
+  "cf5b0110554db41442415c1fc5f6c1599a54ace7": {
+    "commit_sha": "cf5b0110554db41442415c1fc5f6c1599a54ace7",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Regex failed to match when \"Package\" had a \"(Required)\" suffix or was the last section\u2014classic greedy matching gotcha that broke auto-labeling."
+  },
+  "2ab225769dfae691317a584c07f01a83b58ce4fd": {
+    "commit_sha": "2ab225769dfae691317a584c07f01a83b58ce4fd",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Pre-commit hook stripped trailing whitespace from `.ambr` snapshot files, corrupting test fixtures\u2014one-line exclude saves the day."
+  },
+  "6bcc4a1af10200b27fe9932661b6fca1aac89ae4": {
+    "commit_sha": "6bcc4a1af10200b27fe9932661b6fca1aac89ae4",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Leftover \"TODO\" in docstring replaced with actual description\u2014pure documentation cleanup, not a runtime bug."
+  },
+  "725d204b95c3a038557cd3f3040ab9c8cd102a5f": {
+    "commit_sha": "725d204b95c3a038557cd3f3040ab9c8cd102a5f",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Summarization messages lacked source tagging, making them indistinguishable from user input\u2014metadata fix for observability."
+  },
+  "2ef23882d236a4b03d5d14c57b07dce4ca90640f": {
+    "commit_sha": "2ef23882d236a4b03d5d14c57b07dce4ca90640f",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Tool error events missing `tool_call_id` made stateless agents impossible to debug\u2014critical metadata gap for OpenAI-compatible streaming."
+  },
+  "e261924030309154e9971a78896d0275d1f4c6bd": {
+    "commit_sha": "e261924030309154e9971a78896d0275d1f4c6bd",
+    "clarity_score": 9,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Generic error \"Unsupported function\" when JSON schema lacked `title` key\u2014now tells you exactly what's missing with actionable guidance."
+  },
+  "d22cfaf7c6248f890b194b960db878ecc5620852": {
+    "commit_sha": "d22cfaf7c6248f890b194b960db878ecc5620852",
+    "clarity_score": 8,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Enforcing keyword-only args prevents silent breakage when subclasses violate the Liskov Substitution Principle\u2014Python's asterisk saves polymorphism."
+  },
+  "3bd8c0c4a3f8797ee647f8f8325472e69054fd60": {
+    "commit_sha": "3bd8c0c4a3f8797ee647f8f8325472e69054fd60",
+    "clarity_score": 7,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Tightening type hints from `typing.Dict` to `builtins.dict` exposed latent Pydantic v1/v2 incompatibility that mypy now catches as unreachable."
+  },
+  "a7b943bbe3b0276eff1da0a075258d924beacef3": {
+    "commit_sha": "a7b943bbe3b0276eff1da0a075258d924beacef3",
+    "clarity_score": 4,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Activating skipped tests and fixing type annotations\u2014housekeeping that prevents future regressions but lacks dramatic failure mode."
+  },
+  "5fbf270c9def1bcab06c4b321ad1ebbc9a1b4709": {
+    "commit_sha": "5fbf270c9def1bcab06c4b321ad1ebbc9a1b4709",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Adding missing type annotations to test parameters\u2014pure hygiene with zero runtime impact."
+  },
+  "e73b027686b710ac42b853580ef7660fae891ef3": {
+    "commit_sha": "e73b027686b710ac42b853580ef7660fae891ef3",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Cleaning up imports and type hints in shell tool tests\u2014cosmetic refactoring that appeases the linter."
+  },
+  "cb0d227d8aff49e9b0d224e8c27c0c8d63f2883e": {
+    "commit_sha": "cb0d227d8aff49e9b0d224e8c27c0c8d63f2883e",
+    "clarity_score": 3,
+    "bug_type": "other",
+    "visceral": false,
+    "juicy_reason": "Fixing type signatures in middleware tests by replacing `typing.Sequence` with `collections.abc.Sequence`\u2014pedantic but correct."
+  }
+}

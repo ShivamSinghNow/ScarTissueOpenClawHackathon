@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "2b6911d9af58ba5a03b9c7102ab47c8aeee70c16",
+  "commit_message": "fix(langchain): keep tool call / `AIMessage` pairings when summarizing (#34609)\n\nFixes #34282\n\n**Before:** When using agents with tools (like file reading, web search,\netc.), the conversation looks like this:\n\n```\n[User]     \"Read these 10 files and summarize them\"\n[AI]       \"I'll read all 10 files\" + [tool_call: read_file x 10]\n[Tool]     \"Contents of file1.txt...\"\n[Tool]     \"Contents of file2.txt...\"\n[Tool]     \"Contents of file3.txt...\"\n... (7 more tool responses)\n```\n\nWhen the conversation gets too long, `SummarizationMiddleware` kicks in\nto compress older messages. The problem was:\n\nIf you asked to keep the last 6 messages, you'd get:\n\n```\n[Summary]  \"Here's what happened before...\"\n[Tool]     \"Contents of file5.txt...\"\n[Tool]     \"Contents of file6.txt...\"\n[Tool]     \"Contents of file7.txt...\"\n[Tool]     \"Contents of file8.txt...\"\n[Tool]     \"Contents of file9.txt...\"\n[Tool]     \"Contents of file10.txt...\"\n```\n\nThe AI's original request to read the files (`[AI]` message with\n`tool_calls`) was summarized away, but the tool responses remained. This\ncaused the error:\n\n```\nError code: 400 - \"No tool call found for function call output with call_id...\"\n```\n\nMany APIs require that every tool response has a matching tool request.\nWithout the AI message, the tool responses are \"orphaned.\"\n\n## The fix\n\nNow when the cutoff lands on tool messages, we **move backward** to\ninclude the AI message that requested those tools:\n\nSame scenario, keeping last 6 messages:\n\n```\n[Summary]  \"Here's what happened before...\"\n[AI]       \"I'll read all 10 files\" + [tool_call: read_file x 10]\n[Tool]     \"Contents of file1.txt...\"\n[Tool]     \"Contents of file2.txt...\"\n... (all 10 tool responses)\n```\n\nThe AI message is preserved along with its tool responses, keeping them\npaired together.\n\n## Practical examples\n\n### Example 1: Parallel tool calls\n\n**Scenario:** Agent reads 10 files in parallel, summarization triggers\n(see above)\n\n### Example 2: Mixed conversation\n\n**Scenario:** User asks question, AI uses tools, user says thanks\n\n```\n[User]     \"What's the weather?\"\n[AI]       \"Let me check\" + [tool_call: get_weather]\n[Tool]     \"72F and sunny\"\n[AI]       \"It's 72F and sunny!\"\n[User]     \"Thanks!\"\n```\n\nKeeping last 2 messages:\n\n| Before (Bug) | After (Fix) |\n|--------------|-------------|\n| Only `[User] \"Thanks!\"` kept | `[AI] + [Tool] + [AI] + [User]` all\nkept |\n| Lost the weather info | Tool pair preserved with response |\n\n### Example 3: Multiple tool sequences\n\n```\n[User]     \"Search for X\"\n[AI]       [tool_call: search]\n[Tool]     \"Results for X\"\n[User]     \"Now search for Y\"\n[AI]       [tool_call: search]\n[Tool]     \"Results for Y\"\n[User]     \"Great!\"\n```\n\n**Keeping last 3 messages:** If cutoff lands on `[Tool] \"Results for\nY\"`, we now include `[AI] [tool_call: search]` to keep the pair\ntogether.",
+  "target_file": "libs/langchain_v1/langchain/agents/middleware/summarization.py",
+  "why_this_is_juicy": "Conversation summarization orphaned tool responses from their AI message parents, breaking the call-response chain agents rely on.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Conversation summarization orphaned tool responses from their AI message parents, breaking the call-response chain agents rely on.",
+    "changed_lines": 80
+  }
+}

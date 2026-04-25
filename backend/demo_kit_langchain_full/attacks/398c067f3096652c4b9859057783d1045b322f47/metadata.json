@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "398c067f3096652c4b9859057783d1045b322f47",
+  "commit_message": "fix(core): populate default args from tool's `args_schema` (#34399)\n\n## Summary\n- Fixes issue where Pydantic default values from `args_schema` were not\npassed to tool functions when the caller omits optional arguments\n- Modified `_parse_input()` in `libs/core/langchain_core/tools/base.py`\nto include fields with non-None defaults\n- Added unit tests to verify default args behavior for both sync and\nasync tools\n\n## Problem\nWhen a tool has an `args_schema` with default values:\n```python\nclass SearchArgs(BaseModel):\n    query: str = Field(..., description=\"Search query\")\n    page: int = Field(default=1, description=\"Page number\")\n    size: int = Field(default=10, description=\"Results per page\")\n\n@tool(\"search\", args_schema=SearchArgs)\ndef search_tool(query: str, page: int, size: int) -> str:\n    return f\"query={query}, page={page}, size={size}\"\n\n# This threw: TypeError: search_tool() missing 2 required positional arguments\nsearch_tool.invoke({\"query\": \"test\"})\n```\n\nThe defaults from `args_schema` were being discarded because\n`_parse_input()` filtered validated results to only include keys from\nthe original input.\n\n## Solution\nChanged the filtering logic to:\n1. Include all fields that were in the original input (validated)\n2. Also include fields with non-None defaults from the Pydantic schema\n\nThis applies user-defined defaults (like `Field(default=1)`) while\nexcluding synthetic fields from `*args`/`**kwargs` which have\n`default=None`.\n\n## Test plan\n- [x] Added `test_tool_args_schema_default_values` - tests sync tool\nwith defaults\n- [x] Added `test_tool_args_schema_default_values_async` - tests async\ntool with defaults\n- [x] All existing tests pass (150 passed, 4 skipped)\n- [x] Lint passes\n\nFixes #34384\n\n---------\n\nCo-authored-by: Mason Daugherty <mason@langchain.dev>\nCo-authored-by: Mason Daugherty <github@mdrxy.com>",
+  "target_file": "libs/core/langchain_core/tools/base.py",
+  "why_this_is_juicy": "Default parameter values from Pydantic schemas were ignored, forcing callers to manually pass defaults every time.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Default parameter values from Pydantic schemas were ignored, forcing callers to manually pass defaults every time.",
+    "changed_lines": 151
+  }
+}

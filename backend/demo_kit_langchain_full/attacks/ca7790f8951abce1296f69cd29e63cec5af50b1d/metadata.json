@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "ca7790f8951abce1296f69cd29e63cec5af50b1d",
+  "commit_message": "fix(core): fix callback manager merge mixing handlers (#32028) (#33617)\n\n## Description\nFixed `BaseCallbackManager.merge()` method to correctly preserve the\ndistinction between `handlers` and `inheritable_handlers` during merge\noperations.\n\nPreviously, the merge method was using `add_handler()` which incorrectly\nadded handlers to both lists when `inherit=True`, causing\ncross-contamination between regular and inheritable handlers.\n\nThe fix directly passes the combined handler lists to the constructor\ninstead of using `add_handler()`, ensuring proper separation is\nmaintained.\n\n## Issue\nFixes #32028\n\n## Dependencies\nNone\n\n## Testing\n- Modified existing test `test_merge_preserves_handler_distinction()` to\nverify handlers remain properly separated after merge\n\n## Checklist\n- [x] **Breaking Changes**: No breaking changes - only fixes incorrect\nbehavior\n- [x] **Type Hints**: All functions have complete type annotations\n- [x] **Tests**: Fix is fully tested with existing unit test\n- [x] **Security**: No security implications\n- [x] **Documentation**: No documentation changes needed - bug fix only\n- [x] **Code Quality**: Passes lint and format checks\n- [x] **Commit Message**: Follows Conventional Commits format\n\n---------\n\nCo-authored-by: Mason Daugherty <mason@langchain.dev>",
+  "target_file": "libs/core/langchain_core/callbacks/base.py",
+  "why_this_is_juicy": "Callback manager merge was cross-contaminating handler lists because add_handler() polluted both buckets when inherit=True\u2014classic list-mixing footgun.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Callback manager merge was cross-contaminating handler lists because add_handler() polluted both buckets when inherit=True\u2014classic list-mixing footgun.",
+    "changed_lines": 32
+  }
+}

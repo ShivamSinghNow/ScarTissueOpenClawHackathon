@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "e99ccbc126d29aff40269024b2bebb8bab68715e",
+  "commit_message": "fix(core): URL-encode bgColor in mermaid API calls (#34461)\n\nURL-encode the bgColor parameter to fix 400 errors from mermaid.ink API.\n\nThe `!` character in `!white` was not encoded, causing API failures.\n\nFixes #34444",
+  "target_file": "libs/core/langchain_core/runnables/graph_mermaid.py",
+  "why_this_is_juicy": "Mermaid diagram generation was completely broken because '!' in '!white' wasn't URL-encoded, causing 400 errors from the API.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Mermaid diagram generation was completely broken because '!' in '!white' wasn't URL-encoded, causing 400 errors from the API.",
+    "changed_lines": 5
+  }
+}

@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+chroma_db/
+
+# Node
+node_modules/
+.next/
+out/
+.env.local
+.env.*.local
+
+# General
+.DS_Store
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+
+backend/.env
+backend/chroma_db/
+/tmp/
+*.pyc
+__pycache__/
+.venv/
+node_modules/
+.next/
+backend/demo_kit_langchain_small/

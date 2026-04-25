@@ -1,0 +1,92 @@
+[
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "294dda8df27fda136b9e5c9aa413a9036a7cfadb",
+    "pr_title": "refactor(core): Simplify mermaid.ink API URL construction",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes the URL encoding of background_color that was added to fix HTTP 400 errors when using named colors like 'white' with the mermaid.ink API (issue #34444).",
+    "latency_seconds": 25.87
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "2b6911d9af58ba5a03b9c7102ab47c8aeee70c16",
+    "pr_title": "refactor(langchain): simplify summarization middleware message slicing logic",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes the backward search logic that preserves AIMessage/ToolMessage pairs together, reverting to the simple forward-advance approach that was fixed in commit 2b6911d because it caused \"No tool call found for function call output\" errors when tool responses were orphaned from their AIMessage requests.",
+    "latency_seconds": 76.251
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "2bc982b73c58d8dac8f77a7e3bc339a6cf672685",
+    "pr_title": "refactor(ollama): simplify message serialization logic",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes the empty load response handling logic added in d40fd5a that prevents agents from terminating prematurely when Ollama returns done_reason='load' with no content, and also deletes core methods like _generate, _stream, _agenerate, _astream, and with_structured_output.",
+    "latency_seconds": 76.86
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "2d4f00a45130f62c1b994ff03c032f308d79456e",
+    "pr_title": "refactor(openai): Simplify embeddings batching logic for better performance",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes the dynamic batching logic that respects MAX_TOKENS_PER_REQUEST (300k), reverting to fixed-size batching that caused BadRequest errors when batches exceeded OpenAI's token limit.",
+    "latency_seconds": 58.011
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "398c067f3096652c4b9859057783d1045b322f47",
+    "pr_title": "refactor(core): simplify tool input parsing logic",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR adds a python code fence marker (```python) at the start of a Python source file, which will cause a syntax error and break the entire module.",
+    "latency_seconds": 113.27
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "63673b765b7deffcd116ba8f3833a7ff8a2ac8d2",
+    "pr_title": "Refactor: Simplify ChatMistralAI retry logic and remove deprecated decorator",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "Adding a markdown code fence (```python) at the beginning of a Python source file will cause a syntax error and break the entire module.",
+    "latency_seconds": 79.572
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "bc21045ee054b233aa6c4f65653b26a0a7ff340f",
+    "pr_title": "refactor(ollama): simplify message conversion logic",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes the shallow copy protection that was added in bc21045 to prevent _convert_messages_to_ollama_messages from mutating the caller's message list when converting v1 format content.",
+    "latency_seconds": 97.488
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "ca7790f8951abce1296f69cd29e63cec5af50b1d",
+    "pr_title": "refactor(core): simplify BaseCallbackManager.merge() implementation",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR reintroduces the exact bug fixed in ca7790f89: using add_handler() in merge() causes cross-contamination between handlers and inheritable_handlers lists, breaking the distinction between regular and inheritable handlers.",
+    "latency_seconds": 86.46
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "d84eef667af9bd2480b5c50852dad0b393f40c29",
+    "pr_title": "refactor(core): simplify get_buffer_string message formatting",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "Adding a markdown code fence marker (```python) at the top of a Python source file will cause a syntax error and prevent the module from being imported.",
+    "latency_seconds": 81.389
+  },
+  {
+    "repo": "langchain-ai/langchain",
+    "attack_sha": "e99ccbc126d29aff40269024b2bebb8bab68715e",
+    "pr_title": "refactor(core): Simplify mermaid diagram URL construction",
+    "caught": true,
+    "matched_correct_commit": true,
+    "top_warning_text": "This PR removes URL encoding of the bgColor parameter that was added to fix HTTP 400 errors when using named colors like 'white' (which get prefixed with '!' that must be encoded as '%21').",
+    "latency_seconds": 24.026
+  }
+]

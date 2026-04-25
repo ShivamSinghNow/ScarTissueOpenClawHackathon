@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "bc21045ee054b233aa6c4f65653b26a0a7ff340f",
+  "commit_message": "fix(ollama): prevent `_convert_messages_to_ollama_messages` from mutating caller list (#36567)\n\nFixes #36564\n\nThe method modifies messages[idx] in-place when converting v1 format\ncontent. Add messages = list(messages) to create a shallow copy before\nany mutations.\n\n1 line change in libs/partners/ollama/langchain_ollama/chat_models.py\n\nCo-authored-by: bahtya <bahtyar153@qq.com>\nCo-authored-by: Mason Daugherty <mason@langchain.dev>",
+  "target_file": "libs/partners/ollama/langchain_ollama/chat_models.py",
+  "why_this_is_juicy": "One-line fix prevents silent data corruption by adding a shallow copy before in-place mutations\u2014classic Python gotcha that breaks caller expectations.",
+  "score": {
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "One-line fix prevents silent data corruption by adding a shallow copy before in-place mutations\u2014classic Python gotcha that breaks caller expectations.",
+    "changed_lines": 1
+  }
+}

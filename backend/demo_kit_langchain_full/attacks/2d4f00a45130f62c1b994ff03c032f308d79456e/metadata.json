@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "2d4f00a45130f62c1b994ff03c032f308d79456e",
+  "commit_message": "fix(openai): Respect 300k token limit for embeddings API requests (#33668)\n\n## Description\n\nFixes #31227 - Resolves the issue where `OpenAIEmbeddings` exceeds\nOpenAI's 300,000 token per request limit, causing 400 BadRequest errors.\n\n## Problem\n\nWhen embedding large document sets, LangChain would send batches\ncontaining more than 300,000 tokens in a single API request, causing\nthis error:\n```\nopenai.BadRequestError: Error code: 400 - {'error': {'message': 'Requested 673477 tokens, max 300000 tokens per request'}}\n```\n\nThe issue occurred because:\n- The code chunks texts by `embedding_ctx_length` (8191 tokens per\nchunk)\n- Then batches chunks by `chunk_size` (default 1000 chunks per request)\n- **But didn't check**: Total tokens per batch against OpenAI's 300k\nlimit\n- Result: `1000 chunks \u00d7 8191 tokens = 8,191,000 tokens` \u2192 Exceeds\nlimit!\n\n## Solution\n\nThis PR implements dynamic batching that respects the 300k token limit:\n\n1. **Added constant**: `MAX_TOKENS_PER_REQUEST = 300000`\n2. **Track token counts**: Calculate actual tokens for each chunk\n3. **Dynamic batching**: Instead of fixed `chunk_size` batches,\naccumulate chunks until approaching the 300k limit\n4. **Applied to both sync and async**: Fixed both\n`_get_len_safe_embeddings` and `_aget_len_safe_embeddings`\n\n## Changes\n\n- Modified `langchain_openai/embeddings/base.py`:\n  - Added `MAX_TOKENS_PER_REQUEST` constant\n  - Replaced fixed-size batching with token-aware dynamic batching\n  - Applied to both sync (line ~478) and async (line ~527) methods\n- Added test in `tests/unit_tests/embeddings/test_base.py`:\n- `test_embeddings_respects_token_limit()` - Verifies large document\nsets are properly batched\n\n## Testing\n\nAll existing tests pass (280 passed, 4 xfailed, 1 xpassed).\n\nNew test verifies:\n- Large document sets (500 texts \u00d7 1000 tokens = 500k tokens) are split\ninto multiple API calls\n- Each API call respects the 300k token limit\n\n## Usage\n\nAfter this fix, users can embed large document sets without errors:\n```python\nfrom langchain_openai import OpenAIEmbeddings\nfrom langchain_chroma import Chroma\nfrom langchain_text_splitters import CharacterTextSplitter\n\n# This will now work without exceeding token limits\nembeddings = OpenAIEmbeddings()\ndocuments = CharacterTextSplitter().split_documents(large_documents)\nChroma.from_documents(documents, embeddings)\n```\n\nResolves #31227\n\n---------\n\nCo-authored-by: Kaparthy Reddy <kaparthyreddy@Kaparthys-MacBook-Air.local>\nCo-authored-by: Chester Curme <chester.curme@gmail.com>\nCo-authored-by: Mason Daugherty <mason@langchain.dev>\nCo-authored-by: Mason Daugherty <github@mdrxy.com>",
+  "target_file": "libs/partners/openai/langchain_openai/embeddings/base.py",
+  "why_this_is_juicy": "Batching logic ignored OpenAI's 300k token limit, sending 673k tokens and exploding with 400 errors on large document sets\u2014math fail meets API reality.",
+  "score": {
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Batching logic ignored OpenAI's 300k token limit, sending 673k tokens and exploding with 400 errors on large document sets\u2014math fail meets API reality.",
+    "changed_lines": 126
+  }
+}

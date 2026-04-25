@@ -1,0 +1,54 @@
+--- a/libs/core/langchain_core/callbacks/base.py
++++ b/libs/core/langchain_core/callbacks/base.py
+@@ -1,3 +1,4 @@
++```python
+ """Base callback handler for LangChain."""
+ 
+ from __future__ import annotations
+@@ -1014,17 +1015,11 @@
+                 #    ['tag2', 'tag1']
+             ```
+         """  # noqa: E501
+-        # Combine handlers and inheritable_handlers separately, using sets
+-        # to deduplicate (order not preserved)
+-        combined_handlers = list(set(self.handlers) | set(other.handlers))
+-        combined_inheritable = list(
+-            set(self.inheritable_handlers) | set(other.inheritable_handlers)
+-        )
+-
+-        return self.__class__(
++        # Create a new manager with empty handler lists
++        manager = self.__class__(
+             parent_run_id=self.parent_run_id or other.parent_run_id,
+-            handlers=combined_handlers,
+-            inheritable_handlers=combined_inheritable,
++            handlers=[],
++            inheritable_handlers=[],
+             tags=list(set(self.tags + other.tags)),
+             inheritable_tags=list(set(self.inheritable_tags + other.inheritable_tags)),
+             metadata={
+@@ -1037,6 +1032,19 @@
+             },
+         )
+ 
++        # Combine all handlers from both managers
++        all_handlers = self.handlers + other.handlers
++        all_inheritable = self.inheritable_handlers + other.inheritable_handlers
++
++        # Add handlers using add_handler to ensure proper deduplication
++        for handler in all_handlers:
++            manager.add_handler(handler, inherit=False)
++
++        for handler in all_inheritable:
++            manager.add_handler(handler, inherit=True)
++
++        return manager
++
+     @property
+     def is_async(self) -> bool:
+         """Whether the callback manager is async."""
+@@ -1155,3 +1163,4 @@
+ 
+ 
+ Callbacks = list[BaseCallbackHandler] | BaseCallbackManager | None
++```

@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "2bc982b73c58d8dac8f77a7e3bc339a6cf672685",
+  "commit_message": "fix(ollama): serialize `reasoning_content` back to ollama `thinking` (#36573)\n\nCloses #36177.\n\n---\n\nOllama's deserialization path already captures `\"thinking\"` content as\n`additional_kwargs[\"reasoning_content\"]` on `AIMessage`, but the reverse\ndirection \u2014 serializing back to the Ollama wire format \u2014 was missing.\nThis means multi-turn conversations with reasoning models like\n`deepseek-r1` would silently drop the chain-of-thought, breaking agents\nthat need prior reasoning preserved across turns.",
+  "target_file": "libs/partners/ollama/langchain_ollama/chat_models.py",
+  "why_this_is_juicy": "Multi-turn reasoning agents silently lost their chain-of-thought because serialization forgot to write `reasoning_content` back to `thinking`.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Multi-turn reasoning agents silently lost their chain-of-thought because serialization forgot to write `reasoning_content` back to `thinking`.",
+    "changed_lines": 141
+  }
+}

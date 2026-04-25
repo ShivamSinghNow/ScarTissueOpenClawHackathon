@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "63673b765b7deffcd116ba8f3833a7ff8a2ac8d2",
+  "commit_message": "Fix: Enable max_retries Parameter in ChatMistralAI Class (#30448)\n\n**partners: Enable max_retries in ChatMistralAI**\n\n**Description**\n\n- This pull request reactivates the retry logic in the\ncompletion_with_retry method of the ChatMistralAI class, restoring the\nintended functionality of the previously ineffective max_retries\nparameter. New unit test that mocks failed/successful retry calls and an\nintegration test to confirm end-to-end functionality.\n\n**Issue**\n- Closes #30362\n\n**Dependencies**\n- No additional dependencies required\n\nCo-authored-by: andrasfe <andrasf94@gmail.com>",
+  "target_file": "libs/partners/mistralai/langchain_mistralai/chat_models.py",
+  "why_this_is_juicy": "Retry decorator was commented out, so `max_retries` parameter silently did nothing\u2014users thought they had resilience but got instant failures.",
+  "score": {
+    "demo_score": 100.0,
+    "clarity_score": 10.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "retry/idempotency issue",
+    "visceral": true,
+    "juicy_reason": "Retry decorator was commented out, so `max_retries` parameter silently did nothing\u2014users thought they had resilience but got instant failures.",
+    "changed_lines": 89
+  }
+}

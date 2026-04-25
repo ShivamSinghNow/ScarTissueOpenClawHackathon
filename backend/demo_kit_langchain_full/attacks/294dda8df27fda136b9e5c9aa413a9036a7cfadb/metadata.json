@@ -1,0 +1,18 @@
+{
+  "repo": "langchain-ai/langchain",
+  "original_incident_sha": "294dda8df27fda136b9e5c9aa413a9036a7cfadb",
+  "commit_message": "test(core): URL-encode bgColor parameter in mermaid.ink API calls (#34466)\n\n## Problem\n\nThe `draw_mermaid_png()` function fails with HTTP 400 when using named\nbackground colors like `white`. This is because named colors get\nprefixed with `!` (e.g., `!white`) but this special character is not\nURL-encoded before being added to the API URL.\n\nAs reported in #34444, the URL parameter `bgColor=!white` causes\nmermaid.ink to return a 400 Bad Request error.\n\n## Solution\n\nURL-encode the `background_color` parameter using `urllib.parse.quote()`\nbefore constructing the API URL. This ensures special characters like\n`!` are properly encoded as `%21`.\n\n## Changes\n\n- Added `import urllib.parse` \n- URL-encode `background_color` value with\n`urllib.parse.quote(str(background_color), safe=\"\")`\n- Added 2 unit tests:\n- `test_mermaid_bgcolor_url_encoding`: Verifies named colors are\nproperly encoded\n- `test_mermaid_bgcolor_hex_not_encoded`: Verifies hex colors work\ncorrectly\n\n## Testing\n\n```bash\npytest tests/unit_tests/runnables/test_graph.py::test_mermaid_bgcolor_url_encoding -v\npytest tests/unit_tests/runnables/test_graph.py::test_mermaid_bgcolor_hex_not_encoded -v\n```\n\nBoth tests pass.\n\nFixes #34444\n\n---\n*This contribution was made with AI assistance (Claude).*\n\nCo-authored-by: Mr-Neutr0n <mrneutron@users.noreply.github.com>\nCo-authored-by: Mason Daugherty <mason@langchain.dev>",
+  "target_file": "libs/core/langchain_core/runnables/graph_mermaid.py",
+  "why_this_is_juicy": "Named colors like 'white' got prefixed with '!' but never URL-encoded, causing mermaid.ink API to 400\u2014classic forgot-to-escape bug.",
+  "score": {
+    "demo_score": 97.0,
+    "clarity_score": 9.0,
+    "issue_closed": true,
+    "focused_fix": true,
+    "recent_fix": true,
+    "bug_type": "other",
+    "visceral": true,
+    "juicy_reason": "Named colors like 'white' got prefixed with '!' but never URL-encoded, causing mermaid.ink API to 400\u2014classic forgot-to-escape bug.",
+    "changed_lines": 44
+  }
+}
