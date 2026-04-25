@@ -23,6 +23,12 @@ _PATH_BOOST_EXACT = 0.30      # historical commit touched the exact PR file
 _PATH_BOOST_DIRECTORY = 0.15  # same directory
 _PATH_BOOST_BASENAME = 0.10   # same filename in a different directory
 
+# Drop hits whose cosine similarity is below this floor before returning. The
+# default is conservative — Chroma cosine similarity is in [0, 1] and a 0.35
+# match on a sentence-transformer model is usually noise. Override via
+# SCARTISSUE_MIN_SIMILARITY env var.
+_DEFAULT_MIN_SIMILARITY = float(os.environ.get("SCARTISSUE_MIN_SIMILARITY", "0.35"))
+
 
 def _build_embedding_text(incident: Incident) -> str:
     msg = incident.commit_message[:500]
@@ -126,13 +132,19 @@ class ScarIndex:
         query: str,
         top_k: int = 5,
         pr_files: list[str] | None = None,
+        min_similarity: float | None = None,
     ) -> list[tuple[Incident, float]]:
-        """Returns (incident, blended_score) sorted by relevance.
+        """Returns (incident, cosine_similarity) sorted by relevance.
 
         When pr_files is given, results are re-ranked so historical commits
         touching paths that overlap with the PR's files float above otherwise
         equally-similar generic matches.
+
+        Hits below min_similarity are dropped. The path-overlap boost is used
+        only for ranking; the threshold applies to the raw cosine score so
+        callers can compare against an absolute number.
         """
+        floor = _DEFAULT_MIN_SIMILARITY if min_similarity is None else min_similarity
         try:
             col = self._client.get_collection(name=_collection_name(repo))
         except Exception:
@@ -164,6 +176,8 @@ class ScarIndex:
                 incident = Incident.model_validate_json(meta["incident_json"])
                 # chromadb cosine space: distance = 1 - cosine_similarity
                 similarity = 1.0 - dist
+                if similarity < floor:
+                    continue
                 if pr_files:
                     boost = _path_overlap_boost(incident.files_changed, pr_files)
                     blended = similarity + boost

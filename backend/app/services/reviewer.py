@@ -52,8 +52,14 @@ _TOOLS: list[dict] = [
         "name": "search_scar_tissue",
         "description": (
             "Search the repo's historical bug fix index for incidents similar to a PR change. "
-            "Returns up to 5 past incidents with their commit shas, messages, and fix diffs. "
-            "Use this as your primary signal for detecting regressions."
+            "Returns {results: [...up to 5 incidents], indexed_incidents: int, reason?: str}. "
+            "Each result has commit_sha, commit_message, commit_date, files_changed, similarity. "
+            "An empty results list with reason='repo_not_indexed' means the repo has no scar "
+            "tissue indexed yet — do not emit warnings in that case. An empty results list with "
+            "reason='no_hits_above_similarity_floor' means nothing in the index is close enough "
+            "to confidently flag — prefer silence over speculation. Use similarity scores to "
+            "calibrate confidence: high similarity (>0.6) means strong embedding match; medium "
+            "(0.4–0.6) means worth investigating; below 0.4 is filtered out automatically."
         ),
         "input_schema": {
             "type": "object",
@@ -203,13 +209,14 @@ class Reviewer:
             # whose phrasing happens to overlap.
             pr_file = inp.get("pr_file")
             pr_files = [pr_file] if pr_file else None
+            stats = self._scar.collection_stats(pr.repo)
             hits = self._scar.search(
                 repo=pr.repo,
                 query=inp["query"],
                 top_k=5,
                 pr_files=pr_files,
             )
-            return [
+            results = [
                 {
                     "commit_sha": inc.commit_sha,
                     "commit_message": inc.commit_message.splitlines()[0][:120],
@@ -219,6 +226,21 @@ class Reviewer:
                 }
                 for inc, score in hits
             ]
+            if results:
+                return {"results": results, "indexed_incidents": stats["count"]}
+            # Distinguish "nothing similar enough" from "repo not indexed" so the
+            # agent doesn't conflate them and emit confident warnings on noise.
+            if stats["count"] == 0:
+                return {
+                    "results": [],
+                    "indexed_incidents": 0,
+                    "reason": "repo_not_indexed",
+                }
+            return {
+                "results": [],
+                "indexed_incidents": stats["count"],
+                "reason": "no_hits_above_similarity_floor",
+            }
 
         if name == "get_incident_details":
             sha = inp["commit_sha"]
