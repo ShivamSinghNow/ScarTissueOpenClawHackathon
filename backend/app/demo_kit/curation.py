@@ -207,7 +207,11 @@ def _rate_with_claude(
         claude = ClaudeClient()
 
     ratings: dict[str, dict] = _load_rating_cache(ratings_cache_path)
-    batch_size = 6
+    # Larger batches per call to amortize Anthropic round-trip latency. Each
+    # commit contributes ~700 chars of message + 1000 chars of diff ≈ 500
+    # tokens. 24 commits ≈ 12K input tokens — well under the per-request cap
+    # and keeps wall-clock for a 400-incident curation pool inside ~10 min.
+    batch_size = 24
     for start in range(0, len(incidents), batch_size):
         batch = incidents[start : start + batch_size]
         missing = [incident for incident in batch if incident.commit_sha not in ratings]
@@ -233,7 +237,10 @@ def _rate_with_claude(
                 '"juicy_reason":"one punchy sentence"}]}.'
             ),
             prompt=json.dumps({"incidents": payload}),
-            max_tokens=1800,
+            # Each rating row is ~150 chars / ~50 tokens. 24-commit batches
+            # need ~1500 output tokens; 1800 was tuned for 6-commit batches
+            # and silently truncates when batch_size grew.
+            max_tokens=4096,
         )
         for item in response.get("ratings", []):
             sha = item.get("commit_sha")
