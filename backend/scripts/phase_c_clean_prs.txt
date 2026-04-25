@@ -1,0 +1,8 @@
+# 5 hand-picked encode/httpx PRs that are clearly NOT bug fixes.
+# Used for Phase-C false-positive rate measurement: ScarTissue should emit
+# ZERO warnings on these.
+https://github.com/encode/httpx/pull/3773
+https://github.com/encode/httpx/pull/3677
+https://github.com/encode/httpx/pull/3667
+https://github.com/encode/httpx/pull/3665
+https://github.com/encode/httpx/pull/3579
