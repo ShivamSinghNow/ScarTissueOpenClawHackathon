@@ -34,7 +34,14 @@ def _build_embedding_text(incident: Incident) -> str:
     msg = incident.commit_message[:500]
     files = ", ".join(incident.files_changed)
     diff = incident.fix_diff[:1500]
-    return f"Commit message: {msg}\nFiles changed: {files}\nFix diff: {diff}"
+    parts = [
+        f"Commit message: {msg}",
+        f"Files changed: {files}",
+    ]
+    if incident.symptom_summary:
+        parts.append(f"Symptom: {incident.symptom_summary}")
+    parts.append(f"Fix diff: {diff}")
+    return "\n".join(parts)
 
 
 def _collection_name(repo: str) -> str:

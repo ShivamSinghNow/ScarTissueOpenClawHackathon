@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -10,20 +9,12 @@ from typing import Optional
 import git
 
 from app.models.schemas import Incident
-
-# ── detection patterns ────────────────────────────────────────────────────────
-
-_FIRST_LINE_RE = re.compile(
-    r"\b(fix|fixes|fixed|bugfix|hotfix|patch|regression|revert)\b",
-    re.IGNORECASE,
+from app.services.bugfix_classifier import (
+    BugFixClassifier,
+    extract_issue_refs,
+    is_revert,
+    keyword_classify,
 )
-_CLOSING_RE = re.compile(
-    r"(?:fixes|closes|resolves|fix)\s+#\d+",
-    re.IGNORECASE,
-)
-_REVERT_HEADER_RE = re.compile(r'^Revert\s+"', re.IGNORECASE)
-_REVERT_BODY_RE = re.compile(r"this reverts commit", re.IGNORECASE)
-_ISSUE_RE = re.compile(r"(?:fixes|closes|resolves|fix)\s+#(\d+)", re.IGNORECASE)
 
 _MAX_DIFF_CHARS = 8_000
 _MAX_DIFF_LINES = 500
@@ -61,12 +52,23 @@ class GitMiner:
 
     # ── public API ─────────────────────────────────────────────────────────────
 
-    def mine(self, repo: str, max_commits: int = 3000) -> list[Incident]:
-        """Clone (or update) a repo and return all incident commits found."""
+    def mine(
+        self,
+        repo: str,
+        max_commits: int = 3000,
+        classifier: BugFixClassifier | None = None,
+    ) -> list[Incident]:
+        """Clone (or update) a repo and return all incident commits found.
+
+        Stage 1 keyword classifier (extended set + negative pattern subtraction)
+        runs in this loop. If a classifier is passed, it then runs in batched
+        mode over the candidates as a precision filter and populates
+        symptom_summary on each surviving Incident.
+        """
         owner, name = _parse_repo(repo)
         git_repo = self._get_repo(owner, name)
 
-        incidents: list[Incident] = []
+        candidates: list[Incident] = []
         processed = 0
 
         print(f"[miner] Walking up to {max_commits} commits…")
@@ -76,22 +78,22 @@ class GitMiner:
             if processed % 100 == 0:
                 print(
                     f"[miner] {processed} commits processed | "
-                    f"{len(incidents)} incidents found so far"
+                    f"{len(candidates)} candidates so far"
                 )
 
             message = _decode(commit.message)
 
-            is_revert = self._is_revert(message)
+            is_revert_commit = is_revert(message)
 
             # Skip merge commits unless they are explicit reverts
-            if len(commit.parents) > 1 and not is_revert:
+            if len(commit.parents) > 1 and not is_revert_commit:
                 continue
 
             # Skip root commit (no parent to diff against)
             if not commit.parents:
                 continue
 
-            if not self._is_incident(message):
+            if not keyword_classify(message):
                 continue
 
             parent = commit.parents[0]
@@ -118,7 +120,7 @@ class GitMiner:
 
             author = _decode(getattr(commit.author, "name", None))
 
-            incidents.append(
+            candidates.append(
                 Incident(
                     commit_sha=commit.hexsha,
                     commit_message=message,
@@ -130,24 +132,46 @@ class GitMiner:
                     functions_changed=[],
                     fix_diff=diff_text,
                     buggy_parent_sha=parent.hexsha,
-                    issue_refs=self._extract_issue_refs(message),
+                    issue_refs=extract_issue_refs(message),
                     symptom_summary=None,
                 )
             )
 
         print(
-            f"[miner] Done. {processed} commits processed | "
-            f"{len(incidents)} incidents extracted."
+            f"[miner] Stage-1 keyword pass: {processed} commits processed | "
+            f"{len(candidates)} candidates"
+        )
+
+        if classifier is None:
+            return candidates
+
+        triples = [(c.commit_sha, c.commit_message, c.fix_diff) for c in candidates]
+        classified = classifier.classify_many(triples)
+
+        incidents: list[Incident] = []
+        rejected = 0
+        for cand in candidates:
+            verdict = classified.get(cand.commit_sha)
+            if verdict is None or not verdict.is_bug_fix:
+                rejected += 1
+                continue
+            # Re-construct with the LLM-supplied symptom summary so it flows
+            # into the embedding text downstream.
+            incidents.append(cand.model_copy(update={"symptom_summary": verdict.summary}))
+
+        print(
+            f"[miner] Stage-2 LLM pass: {len(incidents)} confirmed bug-fix commits, "
+            f"{rejected} rejected as non-functional."
         )
         return incidents
 
     # ── kept as public helpers (used by tests / routes) ────────────────────────
 
     def is_incident(self, message: str) -> bool:
-        return self._is_incident(message)
+        return keyword_classify(message)
 
     def extract_issue_refs(self, message: str) -> list[int]:
-        return self._extract_issue_refs(message)
+        return extract_issue_refs(message)
 
     # ── private ────────────────────────────────────────────────────────────────
 
@@ -171,22 +195,6 @@ class GitMiner:
 
         print(f"[miner] Cloning {url} (depth=5000)…")
         return git.Repo.clone_from(url, dest, depth=5000)
-
-    def _is_incident(self, message: str) -> bool:
-        first_line = message.splitlines()[0] if message else ""
-        return (
-            bool(_FIRST_LINE_RE.search(first_line))
-            or bool(_CLOSING_RE.search(message))
-            or self._is_revert(message)
-        )
-
-    def _is_revert(self, message: str) -> bool:
-        return bool(_REVERT_HEADER_RE.match(message)) or bool(
-            _REVERT_BODY_RE.search(message)
-        )
-
-    def _extract_issue_refs(self, message: str) -> list[int]:
-        return [int(n) for n in _ISSUE_RE.findall(message)]
 
     def _count_changed_lines(
         self, repo: git.Repo, parent: git.Commit, commit: git.Commit
