@@ -40,7 +40,11 @@ class ClaudeClient:
                     system=system,
                     messages=[{"role": "user", "content": prompt}],
                 )
-                return self._extract_text(response)
+                # Strip leading/trailing markdown fences from the model output.
+                # The attack generator asks for raw source code with no fences,
+                # but the model often wraps anyway, which corrupts the resulting
+                # patch with literal '```python' on line 1 of the target file.
+                return _strip_code_fences(self._extract_text(response))
             except Exception as exc:
                 last_exc = exc
                 if attempt == 2:
@@ -89,3 +93,26 @@ def _strip_json_fences(text: str) -> str:
             lines = lines[:-1]
         return "\n".join(lines).strip()
     return stripped
+
+
+def _strip_code_fences(text: str) -> str:
+    """Strip a single leading ```... fence and trailing ``` from text-mode output.
+
+    Trailing newline at the end of the file is preserved (Python source files
+    conventionally end with one). Only outermost fences are stripped — fences
+    that legitimately appear inside the file body (e.g. inside docstrings or
+    string literals) are left alone.
+    """
+    if not text:
+        return text
+    lines = text.splitlines(keepends=True)
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines:
+        last = lines[-1].rstrip("\n")
+        if last.strip() == "```":
+            lines = lines[:-1]
+            # Keep a trailing newline to match the convention of source files.
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] = lines[-1] + "\n"
+    return "".join(lines)
