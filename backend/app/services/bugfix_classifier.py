@@ -141,7 +141,7 @@ class BugFixClassifier:
         client: anthropic.Anthropic | None = None,
         model: str = "claude-sonnet-4-5-20250929",
         cache_path: Path | None = None,
-        batch_size: int = 8,
+        batch_size: int = 24,
         max_diff_chars: int = 2000,
     ) -> None:
         self._client = client or anthropic.Anthropic()
