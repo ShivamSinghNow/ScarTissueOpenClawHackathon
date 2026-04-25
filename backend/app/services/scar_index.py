@@ -7,12 +7,24 @@ from pathlib import PurePosixPath
 from typing import Optional
 
 import chromadb
-from sentence_transformers import SentenceTransformer
+import voyageai
 
 from app.models.schemas import Incident
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
-_MAX_QUERY_CHARS = 8_000
+# voyage-code-3: code-trained embedder, 32K token context, Matryoshka 1024-d
+# is the documented default sweet spot. Set SCARTISSUE_EMBED_DIM to 256/512/
+# 2048 to trade index size for quality.
+_MODEL_NAME = "voyage-code-3"
+_EMBED_DIM = int(os.environ.get("SCARTISSUE_EMBED_DIM", "1024"))
+
+# Voyage allows much larger inputs than MiniLM did (32K tokens vs 256 word
+# pieces). Bump the per-record character budget so the diff actually fits.
+_MAX_EMBED_CHARS = 24_000  # safely under the 32K-token cap for code text
+_MAX_QUERY_CHARS = 16_000
+
+# Voyage REST limit is ~128 documents per call; smaller is friendlier on
+# rate limits and lets progress reporting stay responsive.
+_VOYAGE_BATCH = 64
 
 # Re-rank widening: pull this many candidates from cosine, then re-score with
 # path-overlap before returning the requested top_k.
@@ -31,17 +43,24 @@ _DEFAULT_MIN_SIMILARITY = float(os.environ.get("SCARTISSUE_MIN_SIMILARITY", "0.3
 
 
 def _build_embedding_text(incident: Incident) -> str:
-    msg = incident.commit_message[:500]
+    """Compose the commit's embedding-time text.
+
+    voyage-code-3 handles 32K tokens, so we no longer have to truncate the
+    diff to 1500 chars the way the old MiniLM (256-token cap) forced. Cap
+    the whole document at _MAX_EMBED_CHARS, with the diff taking whatever
+    budget is left after the metadata header.
+    """
+    msg = (incident.commit_message or "")[:1500]
     files = ", ".join(incident.files_changed)
-    diff = incident.fix_diff[:1500]
     parts = [
         f"Commit message: {msg}",
         f"Files changed: {files}",
     ]
     if incident.symptom_summary:
         parts.append(f"Symptom: {incident.symptom_summary}")
-    parts.append(f"Fix diff: {diff}")
-    return "\n".join(parts)
+    header = "\n".join(parts) + "\nFix diff:\n"
+    diff_budget = max(0, _MAX_EMBED_CHARS - len(header))
+    return header + (incident.fix_diff or "")[:diff_budget]
 
 
 def _collection_name(repo: str) -> str:
@@ -85,22 +104,90 @@ class ScarIndex:
     def __init__(self, persist_dir: str | None = None) -> None:
         self.persist_dir = persist_dir or os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db")
         self._client = chromadb.PersistentClient(path=self.persist_dir)
-        print(f"[scar_index] Loading embedding model {_MODEL_NAME}…")
-        self._model = SentenceTransformer(_MODEL_NAME)
-        print("[scar_index] Model loaded.")
+        if not os.environ.get("VOYAGE_API_KEY"):
+            raise RuntimeError(
+                "VOYAGE_API_KEY is not set. Add it to backend/.env "
+                "(get one at https://www.voyageai.com)."
+            )
+        print(f"[scar_index] Using embedding model {_MODEL_NAME} ({_EMBED_DIM}-d)")
+        self._voyage = voyageai.Client()
+        # Token meter: callers can read .total_tokens after indexing for cost reporting.
+        self.total_tokens = 0
+        # Self-throttle to stay under the Voyage rate limit. Free tier is 3 RPM
+        # (one call per 20s); paid tier is much higher. Tunable via
+        # SCARTISSUE_VOYAGE_MIN_INTERVAL (seconds between calls). Set to 0 if
+        # you've added a payment method to the Voyage account and don't need
+        # the throttle anymore.
+        self._min_interval = float(os.environ.get("SCARTISSUE_VOYAGE_MIN_INTERVAL", "21"))
+        self._last_call_at = 0.0
+
+    def _embed(self, texts: list[str], input_type: str) -> list[list[float]]:
+        """Embed a batch via voyage-code-3 with retries and token accounting.
+
+        input_type is 'document' for index-time records and 'query' at search
+        time — Voyage uses different prefixes internally for asymmetric
+        retrieval, so passing the right one matters for recall.
+        """
+        import time as _time
+        # Truncate every text to keep us safely under the 32K-token cap.
+        capped = [t[:_MAX_EMBED_CHARS] for t in texts]
+        last_exc: Exception | None = None
+        for attempt in range(5):
+            # Self-throttle to respect the per-account rate limit.
+            elapsed = _time.monotonic() - self._last_call_at
+            if elapsed < self._min_interval:
+                _time.sleep(self._min_interval - elapsed)
+            try:
+                result = self._voyage.embed(
+                    texts=capped,
+                    model=_MODEL_NAME,
+                    input_type=input_type,
+                    output_dimension=_EMBED_DIM,
+                )
+                self._last_call_at = _time.monotonic()
+                self.total_tokens += getattr(result, "total_tokens", 0) or 0
+                return result.embeddings
+            except Exception as exc:
+                self._last_call_at = _time.monotonic()
+                last_exc = exc
+                msg = str(exc).lower()
+                # Rate-limit error → wait a full minute before retrying so the
+                # token bucket refills, not just exponential backoff.
+                if "rate limit" in msg or "429" in msg:
+                    backoff = 30
+                else:
+                    backoff = 2 ** attempt
+                if attempt == 4:
+                    break
+                print(f"[scar_index] Voyage retry {attempt + 1}/5 in {backoff}s: {exc}")
+                _time.sleep(backoff)
+        raise RuntimeError(f"Voyage embed failed after retries: {last_exc}")
 
     def index_incidents(
         self,
         repo: str,
         incidents: list[Incident],
-        batch_size: int = 64,
+        batch_size: int = _VOYAGE_BATCH,
     ) -> int:
         """Embeds and upserts incidents. Returns count indexed."""
         if not incidents:
             return 0
 
-        col = self._client.get_or_create_collection(
-            name=_collection_name(repo),
+        # If a previous index exists with a different embedding dimension
+        # (e.g. legacy MiniLM 384-d), Chroma will reject the upsert. Wipe
+        # and recreate the collection so the new dim takes effect.
+        col_name = _collection_name(repo)
+        existing = None
+        try:
+            existing = self._client.get_collection(name=col_name)
+        except Exception:
+            existing = None
+        if existing is not None:
+            print(f"[scar_index] Dropping existing collection {col_name} for fresh re-index")
+            self._client.delete_collection(name=col_name)
+
+        col = self._client.create_collection(
+            name=col_name,
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -108,7 +195,7 @@ class ScarIndex:
         for i in range(0, len(incidents), batch_size):
             batch = incidents[i : i + batch_size]
             texts = [_build_embedding_text(inc) for inc in batch]
-            embeddings = self._model.encode(texts, show_progress_bar=False).tolist()
+            embeddings = self._embed(texts, input_type="document")
             ids = [inc.commit_sha for inc in batch]
             metadatas = [_flat_metadata(inc, repo) for inc in batch]
             documents = [inc.commit_message.splitlines()[0][:200] for inc in batch]
@@ -120,13 +207,18 @@ class ScarIndex:
                 metadatas=metadatas,
             )
             total += len(batch)
-            print(f"[scar_index] Indexed {total}/{len(incidents)} incidents…")
+            print(
+                f"[scar_index] Indexed {total}/{len(incidents)} incidents… "
+                f"(voyage tokens so far: {self.total_tokens:,})"
+            )
 
         try:
             # Strip immutable hnsw:* keys — chromadb rejects modify() if they're present
             mutable = {k: v for k, v in (col.metadata or {}).items() if not k.startswith("hnsw:")}
             mutable["last_indexed"] = datetime.now(tz=timezone.utc).isoformat()
             mutable["repo"] = repo  # canonical original name, for lossless decode
+            mutable["embedding_model"] = _MODEL_NAME
+            mutable["embedding_dim"] = _EMBED_DIM
             col.modify(metadata=mutable)
         except Exception as exc:
             print(f"[scar_index] Warning: could not update collection metadata: {exc}")
@@ -167,7 +259,7 @@ class ScarIndex:
         # Pull a wider candidate set so re-ranking has room to work.
         widened_k = min(top_k * _RERANK_MULTIPLIER, count) if pr_files else min(top_k, count)
 
-        embedding = self._model.encode([query], show_progress_bar=False).tolist()
+        embedding = self._embed([query], input_type="query")
         results = col.query(
             query_embeddings=embedding,
             n_results=widened_k,
