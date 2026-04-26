@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.index import router as index_router
 from app.routes.github_post import router as github_post_router
+from app.routes.email_review import router as email_review_router
 from app.routes.repos import router as repos_router
 from app.routes.review import router as review_router
 
@@ -26,6 +27,7 @@ app.add_middleware(
 
 app.include_router(index_router)
 app.include_router(github_post_router)
+app.include_router(email_review_router)
 app.include_router(repos_router)
 app.include_router(review_router)
 

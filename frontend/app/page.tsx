@@ -34,6 +34,8 @@ interface Warning {
 
 interface ReviewResponse {
   pr_url: string
+  pr_repo: string
+  upstream_repo: string | null
   pr_title: string
   pr_author: string
   warnings: Warning[]
@@ -46,6 +48,18 @@ interface PostToGithubResponse {
   review_url: string | null
   total_comments: number
   summary_comment: string
+}
+
+interface EmailReviewResponse {
+  pr_url: string
+  recipient: string
+  inbox_id: string | null
+  inbox_address: string | null
+  message_id: string | null
+  thread_id: string | null
+  warnings_sent: number
+  subject: string
+  dry_run: boolean
 }
 
 interface IndexedRepo {
@@ -187,7 +201,7 @@ function colorJsonLine(line: string, lang: string): string {
 ══════════════════════════════════════════════════════════ */
 
 type IconName = 'gitBranch' | 'search' | 'shieldAlert' | 'copy' | 'check' | 'arrowRight' |
-  'externalLink' | 'chevronRight' | 'back' | 'terminal' | 'browser' | 'github' | 'plus' | 'x'
+  'externalLink' | 'chevronRight' | 'back' | 'terminal' | 'browser' | 'github' | 'plus' | 'x' | 'mail'
 
 const ICON_PATHS: Record<IconName, React.ReactNode> = {
   gitBranch:    <><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9a9 9 0 0 0 9 9"/><line x1="6" y1="9" x2="6" y2="21"/></>,
@@ -204,6 +218,7 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   github:       <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>,
   plus:         <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
   x:            <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  mail:         <><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></>,
 }
 
 function Icon({ name, size = 16, stroke = 'currentColor', strokeWidth = 1.5 }: {
@@ -907,7 +922,7 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
   return (
     <div ref={cardRef} className={`wcard ${active ? 'wactive' : ''}`}
       onMouseEnter={onActivate}
-      style={{ background: '#0f0f0f', border: `1px solid ${active ? 'rgba(239,68,68,.2)' : '#1a1a1a'}`, borderRadius: 8, padding: '13px 14px' }}>
+      style={{ background: '#0f0f0f', border: `1px solid ${active ? 'rgba(239,68,68,.2)' : '#1a1a1a'}`, borderRadius: 8, padding: '13px 14px', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 4, padding: '2px 7px' }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.dot, flexShrink: 0 }}/>
@@ -941,9 +956,9 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
       </div>
 
       {w.proposed_fix && (
-        <div style={{ marginBottom: 9, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 5, padding: '8px 10px' }}>
+        <div style={{ marginBottom: 9, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 5, padding: '8px 10px', minWidth: 0 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#333333', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Suggested fix</div>
-          <div style={{ fontSize: 11.5, color: '#5a8a5a', lineHeight: 1.55, fontFamily: 'var(--font-fira-code, monospace)' }}>{w.proposed_fix}</div>
+          <pre style={{ fontSize: 11.5, color: '#9ec79e', lineHeight: 1.55, fontFamily: 'var(--font-fira-code, monospace)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{w.proposed_fix}</pre>
         </div>
       )}
 
@@ -994,6 +1009,18 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
   const [postResult, setPostResult] = useState<PostToGithubResponse | null>(null)
   const [postError, setPostError] = useState<string | null>(null)
 
+  const [confirmEmail, setConfirmEmail] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailResult, setEmailResult] = useState<EmailReviewResponse | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [recipientEmail, setRecipientEmail] = useState('')
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem('scartissue:lastEmail')
+      if (v) setRecipientEmail(v)
+    } catch { /* localStorage may be disabled */ }
+  }, [])
+
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const hunkRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const rightRef = useRef<HTMLDivElement>(null)
@@ -1011,18 +1038,28 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
   }, [data.warnings])
 
   const groups = fileGroups()
-  const prRepo = repoFromPrUrl(data.pr_url)
+  // For forks, scar tissue is keyed by the upstream root, so check the upstream
+  // first and fall back to the literal PR repo (or URL parse for older payloads).
+  const prRepo = data.upstream_repo ?? data.pr_repo ?? repoFromPrUrl(data.pr_url)
+  const forkRepo = data.upstream_repo ? data.pr_repo : null
   const indexedRepo = prRepo ? indexedRepos.find(r => r.repo.toLowerCase() === prRepo.toLowerCase() && r.status === 'indexed') : undefined
   const indexingRepo = prRepo ? indexedRepos.find(r => r.repo.toLowerCase() === prRepo.toLowerCase() && r.status === 'indexing') : undefined
 
+  // Page is the scroll surface; offset by the sticky stack (44 + 36 + 33 = 113) plus a little breathing room.
+  const STICKY_OFFSET = 125
+  const scrollWindowToEl = (el: HTMLElement | null) => {
+    if (!el) return
+    const top = el.getBoundingClientRect().top + window.scrollY - STICKY_OFFSET
+    window.scrollTo({ top, behavior: 'smooth' })
+  }
+
   const scrollCardToIdx = useCallback((idx: number) => {
-    const el = cardRefs.current[idx]
-    if (el && rightRef.current) rightRef.current.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' })
+    // Right panel is its own scroll surface; scrollIntoView walks to the nearest scrollable ancestor.
+    cardRefs.current[idx]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [])
 
   const scrollHunkToIdx = useCallback((idx: number) => {
-    const el = hunkRefs.current[idx]
-    if (el && leftRef.current) leftRef.current.scrollTo({ top: el.offsetTop - 60, behavior: 'smooth' })
+    scrollWindowToEl(hunkRefs.current[idx])
   }, [])
 
   const handleCardActivate = useCallback((idx: number) => setActiveIdx(idx), [])
@@ -1039,8 +1076,7 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
 
   const jumpToFile = (fileIdx: number) => {
     setActiveFile(fileIdx)
-    const el = fileRefs.current[fileIdx]
-    if (el && leftRef.current) leftRef.current.scrollTo({ top: el.offsetTop - 2, behavior: 'smooth' })
+    scrollWindowToEl(fileRefs.current[fileIdx])
   }
 
   const handlePostToGithub = useCallback(() => {
@@ -1064,6 +1100,39 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
       .finally(() => setPosting(false))
   }, [data.pr_url, data.warnings])
 
+  const handleEmail = useCallback(() => {
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      setEmailError('Enter a valid email address.')
+      return
+    }
+    setEmailing(true)
+    setEmailError(null)
+    try { window.localStorage.setItem('scartissue:lastEmail', recipientEmail) } catch { /* ignore */ }
+    fetch('/api/email-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pr_url: data.pr_url,
+        pr_title: data.pr_title,
+        pr_repo: data.pr_repo,
+        pr_author: data.pr_author,
+        recipient_email: recipientEmail,
+        warnings: data.warnings,
+      }),
+    })
+      .then(async r => {
+        const body = await r.json().catch(() => ({ detail: `Server error ${r.status}` }))
+        if (!r.ok) throw new Error(body.detail || `Server error ${r.status}`)
+        return body as EmailReviewResponse
+      })
+      .then(result => {
+        setEmailResult(result)
+        setConfirmEmail(false)
+      })
+      .catch(err => setEmailError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setEmailing(false))
+  }, [data.pr_url, data.pr_title, data.pr_repo, data.pr_author, data.warnings, recipientEmail])
+
   // j/k keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1084,9 +1153,9 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
   }, [data.warnings.length, scrollCardToIdx, scrollHunkToIdx])
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', paddingTop: 44 }}>
-      {/* Meta bar */}
-      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a', padding: '0 16px', height: 36, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+    <div style={{ paddingTop: 44 }}>
+      {/* Meta bar — sticky below the fixed AppHeader (44px) */}
+      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a', padding: '0 16px', height: 36, display: 'flex', alignItems: 'center', position: 'sticky', top: 44, zIndex: 50 }}>
         <button onClick={onReset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333333', padding: '0 8px 0 0', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, marginRight: 10, transition: 'color .1s', fontFamily: 'var(--font-space-grotesk, sans-serif)' }}
           onMouseEnter={e => (e.currentTarget.style.color = '#888')}
           onMouseLeave={e => (e.currentTarget.style.color = '#333333')}>
@@ -1101,6 +1170,15 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         </div>
         <div style={{ width: 1, height: 14, background: '#1a1a1a', margin: '0 10px', flexShrink: 0 }}/>
         <button
+          disabled={data.warnings.length === 0 || emailing || Boolean(emailResult)}
+          onClick={() => { setEmailError(null); setConfirmEmail(true) }}
+          title="Email the PR author the warnings via AgentMail."
+          className="btn-outline"
+          style={{ padding: '6px 11px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, opacity: data.warnings.length === 0 || emailResult ? .45 : 1, cursor: data.warnings.length === 0 || emailResult ? 'not-allowed' : 'pointer', flexShrink: 0, marginRight: 6 }}>
+          <Icon name="mail" size={12}/>
+          {emailing ? 'Sending...' : emailResult ? 'Email sent' : 'Email Author'}
+        </button>
+        <button
           disabled={data.warnings.length === 0 || posting || Boolean(postResult)}
           onClick={() => setConfirmPost(true)}
           title="Requires GITHUB_TOKEN with PR write access."
@@ -1111,8 +1189,8 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         </button>
       </div>
 
-      {/* File tabs */}
-      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a', padding: '0 16px', height: 33, display: 'flex', alignItems: 'stretch', flexShrink: 0, overflowX: 'auto', gap: 0 }}>
+      {/* File tabs — sticky below the meta bar (44 + 36 = 80) */}
+      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a', padding: '0 16px', height: 33, display: 'flex', alignItems: 'stretch', overflowX: 'auto', gap: 0, position: 'sticky', top: 80, zIndex: 40 }}>
         {groups.map(([fileName, idxs], fi) => (
           <button key={fileName} className={`ftab ${activeFile === fi ? 'ftactive' : ''}`}
             onClick={() => jumpToFile(fi)}
@@ -1125,20 +1203,27 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         ))}
       </div>
 
-      {/* Split pane */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Split pane — no internal scrolling; the page itself is the scroll surface */}
+      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
         {/* Left: hunk references */}
-        <div ref={leftRef} style={{ width: '60%', overflow: 'auto', borderRight: '1px solid #1a1a1a' }}>
+        <div ref={leftRef} style={{ width: '60%', borderRight: '1px solid #1a1a1a' }}>
           {data.warnings.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: indexedRepo ? '#4faa6a' : '#d0a060', fontSize: 13, gap: 10, padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Icon name={indexedRepo ? 'check' : 'shieldAlert'} size={16} stroke={indexedRepo ? '#4faa6a' : '#d0a060'} strokeWidth={2}/>
                 {indexedRepo ? `No historical patterns matched. ${indexedRepo.incidents} prior incidents analyzed.` : 'No warnings returned.'}
               </div>
+              {indexedRepo && forkRepo && (
+                <div style={{ fontSize: 11, color: '#666' }}>
+                  PR is from fork {forkRepo} — analyzed against upstream {prRepo}.
+                </div>
+              )}
               {!indexedRepo && prRepo && (
                 <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 7, padding: '10px 12px', maxWidth: 390 }}>
                   <div style={{ fontSize: 12, color: '#d0a060', lineHeight: 1.5 }}>
-                    This repo hasn't been indexed yet. Index {prRepo} to get regression warnings on this PR.
+                    {forkRepo
+                      ? `Upstream ${prRepo} hasn't been indexed yet. Index it to get regression warnings on this PR from fork ${forkRepo}.`
+                      : `This repo hasn't been indexed yet. Index ${prRepo} to get regression warnings on this PR.`}
                   </div>
                   <button className="btn-primary" onClick={() => onIndexRepo(prRepo, 1000)} disabled={Boolean(indexingRepo)} style={{ marginTop: 9, padding: '7px 10px', fontSize: 11.5, opacity: indexingRepo ? .55 : 1, cursor: indexingRepo ? 'not-allowed' : 'pointer' }}>
                     {indexingRepo ? 'Indexing...' : 'Index this repo'}
@@ -1148,9 +1233,9 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
             </div>
           ) : groups.map(([fileName, idxs], fi) => (
             <div key={fileName}>
-              {/* Sticky file header */}
+              {/* Sticky file header — sits below AppHeader (44) + meta bar (36) + file tabs (33) = 113 */}
               <div ref={el => { fileRefs.current[fi] = el }}
-                style={{ padding: '5px 10px', background: '#0a0a0a', borderTop: fi > 0 ? '1px solid #1a1a1a' : 'none', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: 6, position: 'sticky', top: 0, zIndex: 1 }}>
+                style={{ padding: '5px 10px', background: '#0a0a0a', borderTop: fi > 0 ? '1px solid #1a1a1a' : 'none', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: 6, position: 'sticky', top: 113, zIndex: 30 }}>
                 <Icon name="gitBranch" size={10} stroke="#252525"/>
                 <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 10.5, color: '#333333' }}>{fileName}</span>
               </div>
@@ -1173,8 +1258,8 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
           ))}
         </div>
 
-        {/* Right: warning cards */}
-        <div ref={rightRef} style={{ width: '40%', overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a' }}>
+        {/* Right: warning cards — sticky, with its own scrollbar so the user can scroll through all warnings while the left rail stays in view */}
+        <div ref={rightRef} style={{ width: '40%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a', position: 'sticky', top: 113, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 113px)', overflowY: 'auto' }}>
           {(postResult || postError) && (
             <div style={{ background: postResult ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.07)', border: `1px solid ${postResult ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.2)'}`, borderRadius: 7, padding: '9px 10px', fontSize: 11.5, color: postResult ? '#6fcf7f' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               {postResult ? (
@@ -1187,6 +1272,18 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
                 <>
                   <span>{postError}</span>
                   <button onClick={() => setConfirmPost(true)} style={{ background: 'none', border: 'none', color: '#f0a0a0', cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Retry</button>
+                </>
+              )}
+            </div>
+          )}
+          {(emailResult || emailError) && (
+            <div style={{ background: emailResult ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.07)', border: `1px solid ${emailResult ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.2)'}`, borderRadius: 7, padding: '9px 10px', fontSize: 11.5, color: emailResult ? '#6fcf7f' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              {emailResult ? (
+                <span>Emailed {emailResult.warnings_sent} warning{emailResult.warnings_sent !== 1 ? 's' : ''} to {emailResult.recipient}{emailResult.inbox_address && <> · from <span style={{ fontFamily: 'var(--font-fira-code, monospace)' }}>{emailResult.inbox_address}</span></>}</span>
+              ) : (
+                <>
+                  <span>{emailError}</span>
+                  <button onClick={() => setConfirmEmail(true)} style={{ background: 'none', border: 'none', color: '#f0a0a0', cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Retry</button>
                 </>
               )}
             </div>
@@ -1231,6 +1328,43 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
               <button className="btn-outline" disabled={posting} onClick={() => setConfirmPost(false)} style={{ padding: '8px 14px', fontSize: 12.5, opacity: posting ? .5 : 1 }}>Cancel</button>
               <button className="btn-primary" disabled={posting} onClick={handlePostToGithub} style={{ padding: '8px 14px', fontSize: 12.5, minWidth: 112, opacity: posting ? .7 : 1 }}>
                 {posting ? 'Posting...' : 'Post to GitHub'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmEmail && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.68)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+          <div style={{ width: 'min(440px, calc(100vw - 32px))', background: '#0f0f0f', border: '1px solid #252525', borderRadius: 10, boxShadow: '0 18px 70px rgba(0,0,0,.5)', padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(168,216,168,.09)', border: '1px solid rgba(168,216,168,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="mail" size={14} stroke="#a8d8a8"/>
+              </div>
+              <h3 style={{ margin: 0, fontSize: 15, color: '#e5e5e5', letterSpacing: '-0.01em' }}>Email PR author</h3>
+            </div>
+            <p style={{ margin: '0 0 12px', color: '#a0a0a8', fontSize: 13, lineHeight: 1.5 }}>
+              Send the {data.warnings.length} warning{data.warnings.length !== 1 ? 's' : ''} on this PR as an HTML email.
+            </p>
+            <label htmlFor="scartissue-email-input" style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Recipient email</label>
+            <input
+              id="scartissue-email-input"
+              type="email"
+              autoFocus
+              required
+              placeholder="author@example.com"
+              value={recipientEmail}
+              onChange={e => { setRecipientEmail(e.target.value); if (emailError) setEmailError(null) }}
+              onKeyDown={e => { if (e.key === 'Enter' && !emailing) handleEmail() }}
+              style={{ width: '100%', padding: '9px 10px', background: '#0a0a0a', border: '1px solid #252525', borderRadius: 6, color: '#e5e5e5', fontSize: 13, fontFamily: 'var(--font-fira-code, monospace)', outline: 'none', boxSizing: 'border-box' }}
+            />
+            <p style={{ margin: '10px 0 14px', color: '#444444', fontSize: 11.5, lineHeight: 1.45 }}>
+              Powered by <a href="https://agentmail.to" target="_blank" rel="noreferrer" style={{ color: '#777', textDecoration: 'none' }}>AgentMail</a>. Requires AGENTMAIL_API_KEY on the backend.
+            </p>
+            {emailError && <div style={{ marginBottom: 12, background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 6, padding: '8px 9px', color: '#ef4444', fontSize: 11.5 }}>{emailError}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn-outline" disabled={emailing} onClick={() => setConfirmEmail(false)} style={{ padding: '8px 14px', fontSize: 12.5, opacity: emailing ? .5 : 1 }}>Cancel</button>
+              <button className="btn-primary" disabled={emailing || !recipientEmail} onClick={handleEmail} style={{ padding: '8px 14px', fontSize: 12.5, minWidth: 100, opacity: (emailing || !recipientEmail) ? .55 : 1 }}>
+                {emailing ? 'Sending...' : 'Send email'}
               </button>
             </div>
           </div>

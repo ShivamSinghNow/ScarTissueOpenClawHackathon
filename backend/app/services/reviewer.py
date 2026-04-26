@@ -16,7 +16,7 @@ from app.services.scar_index import ScarIndex
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-sonnet-4-5-20250929"
+MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4096
 TEMPERATURE = 0.3
 MAX_ITERATIONS = 20
@@ -145,9 +145,13 @@ def _build_user_message(pr: PRDiff) -> str:
         hunks_parts.append(f"=== {hunk.file_path} ===\n{hunk.header}\n{hunk.content}")
     hunks_str = "\n\n".join(hunks_parts)
 
+    repo_line = f"Repo: {pr.repo}"
+    if pr.upstream_repo:
+        repo_line += f"  (fork of {pr.upstream_repo} — scar-tissue lookups run against the upstream)"
+
     return (
         f"Review this pull request for historical bug reintroduction.\n\n"
-        f"Repo: {pr.repo}\n"
+        f"{repo_line}\n"
         f"PR: #{pr.number} - {pr.title}\n"
         f"Author: {pr.author}\n\n"
         f"Changed files: {files_str}\n\n"
@@ -196,8 +200,11 @@ class Reviewer:
     async def _exec_tool(
         self, pr: PRDiff, name: str, inp: dict[str, Any]
     ) -> Any:
+        # Forks share scar tissue with their upstream — query the indexed root.
+        index_repo = pr.upstream_repo or pr.repo
+
         if name == "search_scar_tissue":
-            hits = self._scar.search(repo=pr.repo, query=inp["query"], top_k=5)
+            hits = self._scar.search(repo=index_repo, query=inp["query"], top_k=5)
             return [
                 {
                     "commit_sha": inc.commit_sha,
@@ -211,14 +218,14 @@ class Reviewer:
 
         if name == "get_incident_details":
             sha = inp["commit_sha"]
-            inc = self._scar.get_by_sha(pr.repo, sha)
+            inc = self._scar.get_by_sha(index_repo, sha)
             if inc is None:
                 return {"error": f"No incident found for sha {sha!r}"}
             return json.loads(inc.model_dump_json())
 
         if name == "search_current_code":
             try:
-                result = await self._nia.search(inp["query"], repositories=[pr.repo])
+                result = await self._nia.search(inp["query"], repositories=[index_repo])
                 # Trim to top 3 hits regardless of response shape
                 for key in ("results", "hits", "items", "matches"):
                     if isinstance(result.get(key), list):
@@ -300,7 +307,7 @@ class Reviewer:
                     try:
                         inp = block.input
                         sha = inp["matched_commit_sha"]
-                        matched = self._scar.get_by_sha(pr.repo, sha)
+                        matched = self._scar.get_by_sha(pr.upstream_repo or pr.repo, sha)
                         w = Warning(
                             pr_file=inp["pr_file"],
                             pr_hunk=inp["pr_hunk_header"],

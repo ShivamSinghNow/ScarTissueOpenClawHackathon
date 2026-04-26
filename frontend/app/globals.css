@@ -25,7 +25,7 @@ html {
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
   background-color: #0a0a0a;
   color: #e5e5e5;
@@ -43,9 +43,11 @@ input::placeholder {
   outline-offset: 2px;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #252525; border-radius: 2px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 5px; border: 2px solid #0a0a0a; }
+::-webkit-scrollbar-thumb:hover { background: #555555; }
+* { scrollbar-width: thin; scrollbar-color: #3a3a3a transparent; }
 
 /* ── Mono / code ── */
 .lc, .ln, .ls,

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C ~/Desktop/langchain branch)",
+      "Bash(git *)",
+      "Bash(xxd)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:3000/ -o /tmp/next-page.html -w \"http %{http_code} size %{size_download}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/_next/static/css/app/layout.css)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/review -H \"Content-Type: application/json\" --data-binary '{\"pr_url\": \"https://github.com/langchain-ai/langchain/pull/35238\"}' --max-time 90)",
+      "Bash(/Users/shivamsingh/Desktop/CS_Portfolio_Projects/ScarTissueOpenClawHackathon/backend/.venv/bin/python -c ' *)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/review -H \"Content-Type: application/json\" --data-binary '{\"pr_url\": \"https://github.com/langchain-ai/langchain/pull/35238\"}' --max-time 120 -o /tmp/review-resp.json -w \"http %{http_code}\\\\n\")"
+    ]
+  }
+}
