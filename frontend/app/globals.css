@@ -242,3 +242,42 @@ pre, code {
   75%  { transform: translate(14px, 8px); }
   100% { transform: translate(0px, 0px); }
 }
+
+/* ── Landing background ambient animations ── */
+@keyframes ambientFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
+  33%      { transform: translate(60px, -40px) scale(1.08); opacity: 0.7; }
+  66%      { transform: translate(-40px, 80px) scale(0.94); opacity: 0.45; }
+}
+@keyframes ambientFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50%      { transform: translate(-70px, 50px) scale(1.12); opacity: 0.75; }
+}
+@keyframes ambientFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  40%      { transform: translate(80px, -30px) scale(0.9); opacity: 0.65; }
+  80%      { transform: translate(-30px, 50px) scale(1.06); opacity: 0.55; }
+}
+@keyframes scanBeamVertical {
+  0%   { transform: translateY(-200px); opacity: 0; }
+  10%  { opacity: 0.5; }
+  85%  { opacity: 0.5; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+@keyframes gridDrift {
+  0%   { background-position: 0px 0px; }
+  100% { background-position: 60px 60px; }
+}
+@keyframes pulseDim {
+  0%, 100% { opacity: 0.05; }
+  50%      { opacity: 0.12; }
+}
+
+.bg-blob-1 { animation: ambientFloat1 38s ease-in-out infinite; will-change: transform, opacity; }
+.bg-blob-2 { animation: ambientFloat2 46s ease-in-out infinite; will-change: transform, opacity; }
+.bg-blob-3 { animation: ambientFloat3 52s ease-in-out infinite; will-change: transform, opacity; }
+.bg-grid   { animation: gridDrift 28s linear infinite; }
+.bg-grid-pulse { animation: pulseDim 9s ease-in-out infinite; }
+.bg-scan-beam  { animation: scanBeamVertical 22s linear infinite; will-change: transform; }
+.bg-scan-beam.delay-1 { animation-delay: -7s; }
+.bg-scan-beam.delay-2 { animation-delay: -14s; }

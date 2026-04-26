@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { motion } from 'motion/react'
+import Hls from 'hls.js'
+import Lenis from 'lenis'
+import { ArrowRight } from 'lucide-react'
 
 /* ══════════════════════════════════════════════════════════
    TYPES
@@ -256,29 +260,23 @@ function LandingLogo() {
 ══════════════════════════════════════════════════════════ */
 
 function LandingNav({ onLaunch }: { onLaunch: () => void }) {
-  const navRef = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const onScroll = () => {
-      if (!navRef.current) return
-      if (window.scrollY > 20) navRef.current.classList.add('nav-scrolled')
-      else navRef.current.classList.remove('nav-scrolled')
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
   return (
-    <nav ref={navRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)', borderBottom: '1px solid transparent', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', transition: 'background .3s, border-color .3s' }}>
-      <LandingLogo/>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <a href="#install" style={{ fontSize: 13, color: '#555555', textDecoration: 'none', transition: 'color .12s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#aaa')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#555555')}>Install</a>
-        <a href="#demo" style={{ fontSize: 13, color: '#555555', textDecoration: 'none', transition: 'color .12s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#aaa')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#555555')}>Demo</a>
-        <button className="btn-primary" onClick={onLaunch} style={{ padding: '7px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-          Launch App <Icon name="arrowRight" size={13}/>
-        </button>
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent" style={{ padding: '16px 24px' }}>
+      <div className="flex items-center justify-between">
+        <LandingLogo/>
+        <div className="hidden md:flex items-center gap-8" style={{ fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+          <a href="#how" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Product</a>
+          <a href="#install" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Install</a>
+          <a href="#demo" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Demo</a>
+          <a href="https://github.com/ShivamSinghNow/ScarTissueOpenClawHackathon" target="_blank" rel="noopener" className="text-sm font-medium text-white/80 hover:text-white transition-colors">GitHub</a>
+        </div>
+        <div className="flex items-center gap-4" style={{ fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+          <button onClick={onLaunch}
+            className="bg-white text-black rounded-full font-semibold transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.25)]"
+            style={{ padding: '10px 20px', fontSize: 14, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            Get Started
+          </button>
+        </div>
       </div>
     </nav>
   )
@@ -288,75 +286,211 @@ function LandingNav({ onLaunch }: { onLaunch: () => void }) {
    LANDING — hero
 ══════════════════════════════════════════════════════════ */
 
+const HERO_VIDEO_SRC = 'https://stream.mux.com/T6oQJQ02cQ6N01TR6iHwZkKFkbepS34dkkIc9iukgy400g.m3u8'
+const HERO_POSTER = 'https://images.unsplash.com/photo-1647356191320-d7a1f80ca777?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjB0ZWNobm9sb2d5JTIwbmV1cmFsJTIwbmV0d29ya3xlbnwxfHx8fDE3Njg5NzIyNTV8MA&ixlib=rb-4.1.0&q=80&w=1080'
+
 function HeroSection({ onLaunch }: { onLaunch: () => void }) {
-  const [scrolled, setScrolled] = useState(false)
-  const [mouse, setMouse] = useState({ x: 0, y: 0 })
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    const onScroll = () => { if (window.scrollY > 80) setScrolled(true) }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    const video = videoRef.current
+    if (!video) return
 
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => setMouse({
-      x: (e.clientX / window.innerWidth - .5) * 2,
-      y: (e.clientY / window.innerHeight - .5) * 2,
-    })
-    window.addEventListener('mousemove', onMove, { passive: true })
-    return () => window.removeEventListener('mousemove', onMove)
+    if (Hls.isSupported()) {
+      const hls = new Hls()
+      hls.loadSource(HERO_VIDEO_SRC)
+      hls.attachMedia(video)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => { /* autoplay blocked */ })
+      })
+      return () => { hls.destroy() }
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = HERO_VIDEO_SRC
+      const onMeta = () => video.play().catch(() => { /* autoplay blocked */ })
+      video.addEventListener('loadedmetadata', onMeta)
+      return () => video.removeEventListener('loadedmetadata', onMeta)
+    }
   }, [])
-
-  const px = (amt: number) => ({ transform: `translate(${mouse.x * amt}px,${mouse.y * amt}px)`, transition: 'transform 400ms ease-out' })
 
   return (
-    <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 32px 60px', position: 'relative', overflow: 'hidden' }}>
-      {/* Ambient glows */}
-      <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(239,68,68,.07) 0%,transparent 70%)', pointerEvents: 'none', animation: 'glow1 18s ease-in-out infinite' }}/>
-      <div style={{ position: 'absolute', bottom: '-15%', right: '-8%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(239,68,68,.05) 0%,transparent 70%)', pointerEvents: 'none', animation: 'glow2 22s ease-in-out infinite' }}/>
-      <div style={{ position: 'absolute', top: '60%', left: '10%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle,rgba(239,68,68,.04) 0%,transparent 70%)', pointerEvents: 'none', animation: 'glow3 16s ease-in-out infinite' }}/>
-      {/* Grid */}
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none' }}/>
-      {/* Vignette */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 60% at 50% 50%,transparent 40%,#0a0a0a 100%)', pointerEvents: 'none' }}/>
-      {/* Drifting blob */}
-      <div className="parallax-layer" style={{ ...px(8), position: 'absolute', top: '30%', left: '50%', marginLeft: -300, marginTop: -300, width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(239,68,68,.2) 0%,transparent 65%)', pointerEvents: 'none', animation: 'blobDrift 20s ease-in-out infinite', filter: 'blur(40px)' }}/>
+    <section
+      className="relative w-full min-h-screen text-white overflow-hidden"
+      style={{ backgroundColor: '#000000', fontFamily: 'var(--font-instrument-sans, sans-serif)' }}
+    >
+      {/* Background video */}
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        poster={HERO_POSTER}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ opacity: 0.6 }}
+      />
 
-      <div style={{ position: 'relative', maxWidth: 680 }}>
-        <div className="parallax-layer hero-badge" style={{ ...px(2), marginBottom: 8, display: 'inline-block' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#111111', border: '1px solid #1a1a1a', borderRadius: 5, padding: '4px 12px', fontSize: 11.5, color: '#555555', fontFamily: 'var(--font-fira-code, monospace)' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }}/>
-            v0.1.0 — open beta
-          </span>
-        </div>
+      {/* Black overlay over video for readability */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"/>
 
-        <h1 className="parallax-layer" style={{ ...px(4), fontSize: 'clamp(36px,5vw,64px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.1, color: '#e5e5e5', margin: '18px 0 0' }}>
-          <span className="hero-line1" style={{ display: 'block' }}>Every codebase</span>
-          <span className="hero-line2" style={{ display: 'block' }}>remembers its bugs.</span>
-        </h1>
-        <p className="parallax-layer hero-sub" style={{ ...px(3), fontSize: 'clamp(16px,2vw,20px)', color: '#555555', marginTop: 14, fontWeight: 400, letterSpacing: '-0.01em' }}>
-          Now your agent does too.
-        </p>
+      {/* Decorative red gradients (red+black palette, swapped from blue) */}
+      <div
+        className="absolute pointer-events-none mix-blend-screen"
+        style={{
+          top: '-20%', left: '20%', width: 600, height: 600, borderRadius: '50%',
+          background: 'rgba(239,68,68,0.20)',
+          filter: 'blur(120px)',
+        }}
+      />
+      <div
+        className="absolute pointer-events-none mix-blend-screen"
+        style={{
+          bottom: '-10%', right: '20%', width: 500, height: 500, borderRadius: '50%',
+          background: 'rgba(140,20,20,0.22)',
+          filter: 'blur(120px)',
+        }}
+      />
 
-        <div className="parallax-layer hero-btns" style={{ ...px(3), display: 'flex', gap: 10, justifyContent: 'center', marginTop: 28 }}>
-          <button className="btn-primary" onClick={onLaunch} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '11px 22px', fontSize: 14 }}>
-            Open Web Interface <Icon name="arrowRight" size={14}/>
+      {/* Subtle grid for depth (matches existing scartissue aesthetic) */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative z-10 mx-auto flex flex-col items-center text-center px-6 max-w-5xl"
+        style={{ marginTop: 130, paddingBottom: 80, gap: 44 }}>
+
+        {/* Pre-headline (Instrument Serif) */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-3xl sm:text-5xl text-white"
+          style={{
+            fontFamily: 'var(--font-instrument-serif, serif)',
+            fontStyle: 'italic',
+            lineHeight: 1.1,
+            letterSpacing: '-0.01em',
+            fontSize: 'clamp(28px, 4.5vw, 48px)',
+            margin: 0,
+          }}
+        >
+          Every codebase remembers its bugs.
+        </motion.p>
+
+        {/* Main headline (Instrument Sans, massive) */}
+        <motion.h1
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="font-semibold tracking-tighter"
+          style={{
+            fontFamily: 'var(--font-instrument-sans, sans-serif)',
+            fontSize: 'clamp(60px, 11vw, 136px)',
+            lineHeight: 0.9,
+            margin: 0,
+            backgroundImage: 'linear-gradient(to bottom, #ffffff, #ffffff 55%, #ffd0d0)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            color: 'transparent',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          Now your agent<br/>does too.
+        </motion.h1>
+
+        {/* Subheadline */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.7 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="text-white max-w-xl"
+          style={{
+            fontFamily: 'var(--font-instrument-sans, sans-serif)',
+            fontSize: 'clamp(16px, 1.6vw, 20px)',
+            lineHeight: 1.65,
+            margin: 0,
+          }}
+        >
+          ScarTissue indexes your repo&apos;s history of fixes and warns when a PR is about
+          to reintroduce a regression your team has already paid for.
+        </motion.p>
+
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+          className="flex flex-col sm:flex-row gap-6 items-center"
+        >
+          {/* Primary: white pill with red arrow circle */}
+          <button
+            onClick={onLaunch}
+            className="group flex items-center rounded-full transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105"
+            style={{
+              background: '#ffffff',
+              padding: '8px 8px 8px 24px',
+              fontFamily: 'var(--font-instrument-sans, sans-serif)',
+            }}
+          >
+            <span style={{ color: '#0a0400', fontWeight: 500, fontSize: 18, marginRight: 16 }}>
+              Open Web Interface
+            </span>
+            <span
+              className="flex items-center justify-center rounded-full transition-colors"
+              style={{
+                width: 40, height: 40,
+                background: '#ef4444',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#dc3838')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#ef4444')}
+            >
+              <ArrowRight size={20} color="#fff" strokeWidth={2}/>
+            </span>
           </button>
-          <button className="btn-outline" onClick={() => document.getElementById('install')?.scrollIntoView({ behavior: 'smooth' })} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '11px 22px', fontSize: 14 }}>
+
+          {/* Secondary: text link with arrow */}
+          <button
+            onClick={() => document.getElementById('install')?.scrollIntoView({ behavior: 'smooth' })}
+            className="group flex items-center gap-2 text-white/70 hover:text-white transition-colors backdrop-blur-sm hover:bg-white/5 rounded-full"
+            style={{
+              padding: '10px 18px',
+              fontFamily: 'var(--font-instrument-sans, sans-serif)',
+              fontSize: 16,
+            }}
+          >
             Install MCP Server
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" strokeWidth={2}/>
           </button>
-        </div>
+        </motion.div>
 
-        <p className="hero-proof" style={{ marginTop: 20, fontSize: 12, color: '#333333', letterSpacing: '0.01em' }}>
-          996 incidents indexed across LangChain&nbsp;&nbsp;·&nbsp;&nbsp;3 repos analyzed&nbsp;&nbsp;·&nbsp;&nbsp;catches regressions before they merge
-        </p>
+        {/* Proof line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.45 }}
+          transition={{ delay: 0.85, duration: 0.5 }}
+          className="text-white"
+          style={{
+            fontFamily: 'var(--font-fira-code, monospace)',
+            fontSize: 12,
+            letterSpacing: '0.01em',
+            margin: 0,
+          }}
+        >
+          indexed across langchain-ai/langchain&nbsp;&nbsp;·&nbsp;&nbsp;encode/httpx&nbsp;&nbsp;·&nbsp;&nbsp;catches regressions before they merge
+        </motion.p>
       </div>
 
-      <div className={`scroll-indicator${scrolled ? ' hidden' : ''}`} style={{ position: 'absolute', bottom: 32, left: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M4 6l4 4 4-4" stroke="#333333" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
+      {/* Bottom fade so the next section blends into pure black */}
+      <div
+        className="absolute bottom-0 left-0 right-0 pointer-events-none"
+        style={{
+          height: 200,
+          background: 'linear-gradient(to bottom, transparent, #0a0a0a)',
+        }}
+      />
     </section>
   )
 }
@@ -365,31 +499,93 @@ function HeroSection({ onLaunch }: { onLaunch: () => void }) {
    LANDING — how it works
 ══════════════════════════════════════════════════════════ */
 
+function SectionHeading({ eyebrow, title, kicker }: { eyebrow?: string; title: string; kicker?: string }) {
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 48 }}>
+      {eyebrow && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 0.55, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.5 }}
+          style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#ef4444', marginBottom: 14 }}>
+          {eyebrow}
+        </motion.div>
+      )}
+      <motion.h2
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        style={{
+          fontFamily: 'var(--font-instrument-serif, serif)',
+          fontStyle: 'italic',
+          fontSize: 'clamp(36px, 5.5vw, 64px)',
+          lineHeight: 1.05,
+          letterSpacing: '-0.02em',
+          color: '#ffffff',
+          margin: 0,
+        }}>
+        {title}
+      </motion.h2>
+      {kicker && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 0.55 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ delay: 0.15, duration: 0.6 }}
+          style={{
+            fontFamily: 'var(--font-instrument-sans, sans-serif)',
+            fontSize: 'clamp(15px, 1.4vw, 18px)',
+            color: '#ffffff',
+            marginTop: 18,
+            maxWidth: 560,
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            lineHeight: 1.6,
+          }}>
+          {kicker}
+        </motion.p>
+      )}
+    </div>
+  )
+}
+
 function HowItWorks() {
   const steps = [
-    { icon: 'gitBranch' as IconName,    title: 'Index',  desc: "Mine your repo's full git history. Every fix commit becomes a data point in your scar tissue index." },
-    { icon: 'search' as IconName,       title: 'Review', desc: 'Paste any PR URL. ScarTissue cross-references every hunk against known regression patterns.' },
-    { icon: 'shieldAlert' as IconName,  title: 'Warn',   desc: 'Receive targeted warnings with matched prior commits, severity ratings, and explanations.' },
+    { icon: 'gitBranch' as IconName,   num: '01', title: 'Index',  desc: "Mine your repo's full git history. Every fix commit becomes a data point in your scar tissue index." },
+    { icon: 'search' as IconName,      num: '02', title: 'Review', desc: 'Paste any PR URL. ScarTissue cross-references every hunk against known regression patterns.' },
+    { icon: 'shieldAlert' as IconName, num: '03', title: 'Warn',   desc: 'Receive targeted warnings with matched prior commits, severity ratings, and proposed fixes.' },
   ]
   return (
-    <section style={{ padding: '80px 32px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.025em', color: '#e5e5e5', margin: 0 }}>How it works</h2>
-      </div>
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+    <section id="how" style={{ padding: '90px 32px 70px', maxWidth: 1140, margin: '0 auto', position: 'relative' }}>
+      <SectionHeading eyebrow="How it works" title="Three steps. No setup ceremony." kicker="Point ScarTissue at any GitHub repo. Within minutes you have a regression-detection layer riding on top of every PR your team opens."/>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
         {steps.map((s, i) => (
-          <div key={i} className="step-card" style={{ flex: '1 1 240px', minWidth: 200 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div className="step-icon" style={{ width: 30, height: 30, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name={s.icon} size={14} stroke="#ef4444" strokeWidth={1.5}/>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 10, color: '#333333' }}>{String(i + 1).padStart(2, '0')}</span>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#e5e5e5', letterSpacing: '-0.015em' }}>{s.title}</span>
-              </div>
+          <motion.div key={s.title}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ delay: i * 0.1, duration: 0.55 }}
+            className="reveal-card"
+            style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,.025) 0%, rgba(255,255,255,.005) 100%)',
+              border: '1px solid rgba(255,255,255,.06)',
+              borderRadius: 16,
+              padding: 28,
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: 240,
+              fontFamily: 'var(--font-instrument-sans, sans-serif)',
+            }}>
+            <div style={{ position: 'absolute', top: 20, right: 22, fontFamily: 'var(--font-fira-code, monospace)', fontSize: 11, color: 'rgba(239,68,68,.4)', letterSpacing: '0.1em' }}>{s.num}</div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
+              <Icon name={s.icon} size={18} stroke="#ef4444" strokeWidth={1.6}/>
             </div>
-            <p style={{ fontSize: 12.5, color: '#555555', lineHeight: 1.65, margin: 0 }}>{s.desc}</p>
-          </div>
+            <h3 style={{ fontSize: 22, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.015em', margin: '0 0 10px' }}>{s.title}</h3>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', lineHeight: 1.65, margin: 0 }}>{s.desc}</p>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent 0%, rgba(239,68,68,.5) 50%, transparent 100%)', opacity: 0.6 }}/>
+          </motion.div>
         ))}
       </div>
     </section>
@@ -403,11 +599,9 @@ function HowItWorks() {
 function InstallSection({ onLaunch }: { onLaunch: () => void }) {
   const [tab, setTab] = useState<'claude' | 'codex' | 'gemini'>('claude')
   const [copied, setCopied] = useState(false)
-  const [btnAnim, setBtnAnim] = useState(false)
 
   const copy = () => {
     navigator.clipboard?.writeText(MCP_CONFIGS[tab].content)
-    setBtnAnim(true); setTimeout(() => setBtnAnim(false), 200)
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
   useEffect(() => setCopied(false), [tab])
@@ -419,80 +613,106 @@ function InstallSection({ onLaunch }: { onLaunch: () => void }) {
   ]
 
   return (
-    <section id="install" style={{ padding: '80px 32px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.025em', color: '#e5e5e5', margin: 0 }}>Install</h2>
-      </div>
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+    <section id="install" style={{ padding: '70px 32px', maxWidth: 1140, margin: '0 auto', position: 'relative' }}>
+      <SectionHeading eyebrow="Install" title="Wire it up in under a minute." kicker="Drop the MCP config into your agent of choice. ScarTissue becomes a tool your model can call from inside any chat or PR review."/>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 32, alignItems: 'stretch' }}>
         {/* Left: tabbed config */}
-        <div style={{ flex: '1 1 340px', minWidth: 280 }}>
-          <div style={{ display: 'flex', borderBottom: '1px solid #1a1a1a', marginBottom: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.55 }}
+          style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, alignSelf: 'flex-start', marginBottom: 16, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
             {tabs.map(t => (
-              <button key={t.id} className={`itab${tab === t.id ? ' itactive' : ''}`} onClick={() => setTab(t.id)}>
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{
+                  background: tab === t.id ? 'rgba(239,68,68,.14)' : 'transparent',
+                  border: tab === t.id ? '1px solid rgba(239,68,68,.3)' : '1px solid transparent',
+                  color: tab === t.id ? '#ffffff' : 'rgba(255,255,255,.55)',
+                  borderRadius: 7,
+                  padding: '7px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all .15s',
+                }}>
                 {t.label}
-                <div className="itab-bar"/>
               </button>
             ))}
           </div>
-          <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 11, color: '#444444', background: '#090909', borderLeft: '1px solid #1a1a1a', borderRight: '1px solid #1a1a1a', padding: '9px 14px 7px' }}>
-            {MCP_CONFIGS[tab].path}
-          </div>
-          <div className="code-block" style={{ position: 'relative', borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none', marginTop: 0 }} data-language={MCP_CONFIGS[tab].lang}>
-            <div className="scanlines"/>
-            <button onClick={copy} className={btnAnim ? 'copy-clicked' : ''} style={{ position: 'absolute', top: 10, right: 10, background: '#111111', border: '1px solid #252525', borderRadius: 5, padding: '4px 8px', cursor: 'pointer', color: copied ? '#4faa6a' : '#555555', fontSize: 11, fontFamily: 'var(--font-space-grotesk, sans-serif)', display: 'flex', alignItems: 'center', gap: 4, transition: 'color .15s', zIndex: 2 }}>
-              <Icon name={copied ? 'check' : 'copy'} size={11} stroke="currentColor"/>
-              {copied ? 'copied' : 'copy'}
-            </button>
-            <pre style={{ margin: 0, whiteSpace: 'pre', overflowX: 'auto', paddingRight: 60 }}>
+          <div style={{ flex: 1, background: '#050505', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(255,255,255,.02)', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, color: 'rgba(255,255,255,.45)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }}/>
+                {MCP_CONFIGS[tab].path}
+              </div>
+              <button onClick={copy}
+                style={{
+                  background: copied ? 'rgba(34,197,94,.12)' : 'rgba(255,255,255,.05)',
+                  border: copied ? '1px solid rgba(34,197,94,.3)' : '1px solid rgba(255,255,255,.08)',
+                  borderRadius: 6,
+                  padding: '5px 10px',
+                  fontSize: 12,
+                  color: copied ? '#6fcf7f' : 'rgba(255,255,255,.65)',
+                  fontFamily: 'var(--font-instrument-sans, sans-serif)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all .15s',
+                }}>
+                <Icon name={copied ? 'check' : 'copy'} size={12} stroke="currentColor"/>
+                {copied ? 'copied' : 'copy'}
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: 20, fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12.5, lineHeight: 1.75, overflowX: 'auto', whiteSpace: 'pre', flex: 1 }}>
               {MCP_CONFIGS[tab].content.split('\n').map((line, i) => (
                 <span key={i} style={{ display: 'block', color: colorJsonLine(line, MCP_CONFIGS[tab].lang) }}>{line}</span>
               ))}
             </pre>
           </div>
-          <p style={{ fontSize: 11.5, color: '#333333', marginTop: 10, lineHeight: 1.6 }}>Prerequisites: clone ScarTissue, run uv pip install -e . from backend/, then populate backend/.env. The scartissue-mcp command becomes available globally after install.</p>
-        </div>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 14, lineHeight: 1.65, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            Prerequisites: clone ScarTissue, run <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>uv pip install -e .</code> from <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>backend/</code>, then populate <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>backend/.env</code>. The <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>scartissue-mcp</code> command becomes available globally after install.
+          </p>
+        </motion.div>
 
-        {/* Right: web interface thumbnail */}
-        <div style={{ flex: '1 1 260px', minWidth: 220, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5', marginBottom: 12, letterSpacing: '-0.01em' }}>Web Interface</div>
-          <div onClick={onLaunch} style={{ background: '#080808', border: '1px solid #1a1a1a', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', flex: 1, minHeight: 160, position: 'relative', transition: 'border-color .12s' }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = '#1a1a1a')}>
-            <div style={{ padding: '12px 0 0' }}>
-              <div style={{ padding: '3px 12px 3px 4px', background: '#0f0f0f', borderBottom: '1px solid #1a1a1a', fontSize: 9, fontFamily: 'var(--font-fira-code, monospace)', color: '#252525' }}>langchain/callbacks/manager.py</div>
-              {[
-                { bg: 'transparent',           sign: ' ', signC: '#333',    code: '    async def on_llm_end(self, response, **kwargs):', codeC: '#444' },
-                { bg: 'rgba(220,55,50,.08)',   sign: '−', signC: '#cc5050', code: '            await handler.aclose()',                  codeC: '#8a6060' },
-                { bg: 'rgba(48,160,72,.08)',   sign: '+', signC: '#4faa6a', code: '            coros.append(handler.on_llm_end(...))',   codeC: '#608a60' },
-                { bg: 'transparent',           sign: ' ', signC: '#333',    code: '    await asyncio.gather(*coros)',                    codeC: '#444' },
-              ].map((l, i) => (
-                <div key={i} style={{ display: 'flex', background: l.bg, padding: '0 8px', gap: 4, alignItems: 'center' }}>
-                  <span style={{ width: 3, background: '#ef4444', alignSelf: 'stretch', flexShrink: 0, opacity: i === 1 || i === 2 ? 0.5 : 0 }}/>
-                  <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 9.5, color: l.signC, width: 12, textAlign: 'center', flexShrink: 0 }}>{l.sign}</span>
-                  <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 9.5, color: l.codeC, whiteSpace: 'pre' }}>{l.code}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ position: 'absolute', right: 8, top: 40, background: '#111111', border: '1px solid rgba(239,68,68,.25)', borderRadius: 5, padding: '7px 9px', width: 140 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 3, padding: '1px 5px', marginBottom: 5 }}>
-                <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#ef4444' }}/>
-                <span style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', letterSpacing: '0.1em' }}>HIGH</span>
-              </div>
-              <div style={{ fontSize: 8.5, fontWeight: 500, color: '#c8c8d8', lineHeight: 1.4, marginBottom: 4 }}>Async iterator cleanup removed</div>
-              <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 8, color: '#333333' }}>manager.py:350</div>
-            </div>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity .15s', background: 'rgba(10,10,10,.6)' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '0')}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#e5e5e5', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Icon name="externalLink" size={13}/> Launch App
+        {/* Right: launch the web interface */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ delay: 0.1, duration: 0.55 }}
+          style={{ display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+          <div style={{ flex: 1, background: 'linear-gradient(180deg, rgba(239,68,68,.06) 0%, rgba(239,68,68,.0) 100%)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 14, padding: '24px 22px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(239,68,68,.65)', marginBottom: 10 }}>Or skip the install</div>
+            <h3 style={{ fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic', fontSize: 28, lineHeight: 1.1, color: '#ffffff', margin: '0 0 12px' }}>
+              Use the web interface.
+            </h3>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', lineHeight: 1.65, margin: 0, flex: 1 }}>
+              Paste any GitHub PR URL and watch ScarTissue cross-reference every hunk against your indexed history in real time. No CLI, no local install.
+            </p>
+            <button
+              onClick={onLaunch}
+              className="group flex items-center rounded-full transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-105"
+              style={{
+                background: '#ffffff',
+                padding: '8px 8px 8px 22px',
+                fontFamily: 'var(--font-instrument-sans, sans-serif)',
+                marginTop: 22,
+                alignSelf: 'flex-start',
+              }}>
+              <span style={{ color: '#0a0400', fontWeight: 500, fontSize: 16, marginRight: 14 }}>Launch App</span>
+              <span
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 36, height: 36, background: '#ef4444', transition: 'background .15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#dc3838')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#ef4444')}>
+                <ArrowRight size={18} color="#fff" strokeWidth={2}/>
               </span>
-            </div>
+            </button>
           </div>
-          <button className="btn-primary" onClick={onLaunch} style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', fontSize: 13 }}>
-            Launch App <Icon name="arrowRight" size={13}/>
-          </button>
-        </div>
+        </motion.div>
       </div>
     </section>
   )
@@ -504,30 +724,51 @@ function InstallSection({ onLaunch }: { onLaunch: () => void }) {
 
 function WhereYouWork() {
   const cols = [
-    { iconName: 'terminal' as IconName, title: 'Your terminal',    desc: 'Native MCP integration for Claude Code, Codex CLI, and Gemini CLI.',                                          status: 'Available',    avail: true },
-    { iconName: 'browser'  as IconName, title: 'Web interface',    desc: 'Paste any PR URL and get instant inline warnings with matched historical commits.',                            status: 'Available',    avail: true },
-    { iconName: 'github'   as IconName, title: 'GitHub bot',       desc: 'Automatically reviews PRs and posts warnings as inline comments when opened.',                                  status: 'Coming soon',  avail: false },
+    { iconName: 'terminal' as IconName, title: 'Your terminal',    desc: 'Native MCP integration for Claude Code, Codex CLI, and Gemini CLI. Ask your agent to review any PR — it returns warnings, severity, and proposed fixes inline.',  status: 'Available',    avail: true },
+    { iconName: 'browser'  as IconName, title: 'Web interface',    desc: 'Paste any PR URL and watch ScarTissue cross-reference every hunk against the indexed history in real time. Post warnings back to GitHub in one click.',         status: 'Available',    avail: true },
+    { iconName: 'github'   as IconName, title: 'GitHub bot',       desc: 'Automatically reviews every PR your team opens and posts warnings as inline review comments. Zero-config once installed on your org.',                          status: 'Coming soon',  avail: false },
   ]
   return (
-    <section style={{ padding: '80px 32px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.025em', color: '#e5e5e5', margin: 0 }}>Runs where you work</h2>
-        <p style={{ fontSize: 13, color: '#333333', marginTop: 8 }}>Review PRs in your terminal, browser, or directly on GitHub.</p>
-      </div>
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+    <section style={{ padding: '70px 32px 90px', maxWidth: 1140, margin: '0 auto', position: 'relative' }}>
+      <SectionHeading eyebrow="Surface area" title="Runs where you work." kicker="Same engine, three places. Whether you live in a terminal, a browser, or GitHub itself, ScarTissue meets you there."/>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
         {cols.map((c, i) => (
-          <div key={i} className="step-card" style={{ flex: '1 1 240px', minWidth: 200 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="step-icon" style={{ width: 30, height: 30, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon name={c.iconName} size={14} stroke="#ef4444" strokeWidth={1.5}/>
-                </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#e5e5e5', letterSpacing: '-0.015em' }}>{c.title}</span>
+          <motion.div key={c.title}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ delay: i * 0.1, duration: 0.55 }}
+            style={{
+              background: c.avail ? 'linear-gradient(180deg, rgba(255,255,255,.025) 0%, rgba(255,255,255,.005) 100%)' : 'rgba(255,255,255,.015)',
+              border: '1px solid rgba(255,255,255,.06)',
+              borderRadius: 16,
+              padding: 28,
+              fontFamily: 'var(--font-instrument-sans, sans-serif)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: 240,
+              opacity: c.avail ? 1 : 0.7,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: c.avail ? 'rgba(239,68,68,.10)' : 'rgba(255,255,255,.04)', border: c.avail ? '1px solid rgba(239,68,68,.22)' : '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={c.iconName} size={18} stroke={c.avail ? '#ef4444' : 'rgba(255,255,255,.35)'} strokeWidth={1.6}/>
               </div>
-              <span className={c.avail ? 'badge-avail' : 'badge-soon'}>{c.status}</span>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                padding: '4px 10px',
+                borderRadius: 4,
+                background: c.avail ? 'rgba(34,197,94,.10)' : 'rgba(255,255,255,.04)',
+                border: c.avail ? '1px solid rgba(34,197,94,.25)' : '1px solid rgba(255,255,255,.08)',
+                color: c.avail ? '#6fcf7f' : 'rgba(255,255,255,.45)',
+              }}>{c.status}</span>
             </div>
-            <p style={{ fontSize: 12.5, color: '#555555', lineHeight: 1.65, margin: 0 }}>{c.desc}</p>
-          </div>
+            <h3 style={{ fontSize: 22, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.015em', margin: '0 0 10px' }}>{c.title}</h3>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', lineHeight: 1.65, margin: 0 }}>{c.desc}</p>
+            {c.avail && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent 0%, rgba(239,68,68,.5) 50%, transparent 100%)', opacity: 0.6 }}/>}
+          </motion.div>
         ))}
       </div>
     </section>
@@ -539,71 +780,75 @@ function WhereYouWork() {
 ══════════════════════════════════════════════════════════ */
 
 function DemoSection() {
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [cardVisible, setCardVisible] = useState(false)
-  useEffect(() => {
-    if (!cardRef.current) return
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) { setCardVisible(true); obs.disconnect() }
-    }, { threshold: 0.3 })
-    obs.observe(cardRef.current)
-    return () => obs.disconnect()
-  }, [])
-
   const prLines = [
-    { sign: ' ', code: '    async def on_llm_end(self, response, **kwargs):',              signC: '#333',    codeC: '#555', bg: 'transparent', pulse: false, marker: false },
-    { sign: ' ', code: '        coros = []',                                               signC: '#333',    codeC: '#555', bg: 'transparent', pulse: false, marker: false },
-    { sign: ' ', code: '        for handler in self.handlers:',                            signC: '#333',    codeC: '#555', bg: 'transparent', pulse: false, marker: false },
-    { sign: '−', code: '            try:',                                                 signC: '#cc5050', codeC: '#8a6060', bg: 'rgba(220,55,50,.09)', pulse: true, marker: false },
-    { sign: '−', code: '                coros.append(handler.on_llm_end(response, **kwargs))', signC: '#cc5050', codeC: '#8a6060', bg: 'rgba(220,55,50,.09)', pulse: true, marker: false },
-    { sign: '−', code: '            finally:',                                             signC: '#cc5050', codeC: '#8a6060', bg: 'rgba(220,55,50,.09)', pulse: true, marker: false },
-    { sign: '−', code: '                await handler.aclose()',                           signC: '#cc5050', codeC: '#c07070', bg: 'rgba(220,55,50,.13)', pulse: true, marker: true },
-    { sign: '+', code: '            coros.append(handler.on_llm_end(response, **kwargs))', signC: '#4faa6a', codeC: '#608a60', bg: 'rgba(48,160,72,.09)', pulse: false, marker: true },
+    { sign: ' ', code: '    async def on_llm_end(self, response, **kwargs):',                  signC: 'rgba(255,255,255,.25)', codeC: 'rgba(255,255,255,.45)', bg: 'transparent', marker: false },
+    { sign: ' ', code: '        coros = []',                                                   signC: 'rgba(255,255,255,.25)', codeC: 'rgba(255,255,255,.45)', bg: 'transparent', marker: false },
+    { sign: ' ', code: '        for handler in self.handlers:',                                signC: 'rgba(255,255,255,.25)', codeC: 'rgba(255,255,255,.45)', bg: 'transparent', marker: false },
+    { sign: '−', code: '            try:',                                                     signC: '#ef4444',                codeC: '#d88080',               bg: 'rgba(239,68,68,.08)', marker: false },
+    { sign: '−', code: '                coros.append(handler.on_llm_end(response, **kwargs))', signC: '#ef4444',                codeC: '#d88080',               bg: 'rgba(239,68,68,.08)', marker: false },
+    { sign: '−', code: '            finally:',                                                 signC: '#ef4444',                codeC: '#d88080',               bg: 'rgba(239,68,68,.08)', marker: false },
+    { sign: '−', code: '                await handler.aclose()',                               signC: '#ef4444',                codeC: '#f0a0a0',               bg: 'rgba(239,68,68,.16)', marker: true },
+    { sign: '+', code: '            coros.append(handler.on_llm_end(response, **kwargs))',     signC: '#6fcf7f',                codeC: '#80c890',               bg: 'rgba(48,160,72,.10)', marker: true },
   ]
 
   return (
-    <section id="demo" style={{ padding: '80px 32px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.025em', color: '#e5e5e5', margin: 0 }}>Example warning</h2>
-        <p style={{ fontSize: 12.5, color: '#333333', marginTop: 8 }}>A real pattern from langchain-ai/langchain, caught before merge.</p>
-      </div>
-      <div style={{ display: 'flex', gap: 0, background: '#080808', border: '1px solid #1a1a1a', borderRadius: 10, overflow: 'hidden', alignItems: 'stretch' }}>
-        <div style={{ flex: '0 0 55%', minWidth: 0, borderRight: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', background: '#0f0f0f', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 600, color: '#333333', letterSpacing: '0.05em', textTransform: 'uppercase' }}>PR Hunk</span>
-            <span className="chip" style={{ marginLeft: 'auto' }}>langchain/callbacks/manager.py</span>
+    <section id="demo" style={{ padding: '70px 32px', maxWidth: 1140, margin: '0 auto', position: 'relative' }}>
+      <SectionHeading eyebrow="Live example" title="A regression caught before it shipped." kicker="A real pattern from langchain-ai/langchain. The PR removed the cleanup path. ScarTissue matched it to the original fix and emitted a high-confidence warning."/>
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-120px' }}
+        transition={{ duration: 0.6 }}
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 0, background: '#050505', border: '1px solid rgba(255,255,255,.08)', borderRadius: 16, overflow: 'hidden', alignItems: 'stretch', boxShadow: '0 30px 100px -40px rgba(239,68,68,.18)' }}>
+        {/* Left: PR diff */}
+        <div style={{ borderRight: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 18px', background: 'rgba(255,255,255,.02)', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }}/>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.5)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>PR hunk</span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, color: 'rgba(255,255,255,.4)' }}>langchain/callbacks/manager.py</span>
           </div>
-          <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 11.5, flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 13, padding: '12px 0', flex: 1 }}>
             {prLines.map((l, i) => (
-              <div key={i} className={l.pulse ? 'del-pulse' : ''} style={{ display: 'flex', alignItems: 'stretch', minHeight: 22, background: l.pulse ? undefined : (l.bg || 'transparent') }}>
-                <div style={{ width: 3, flexShrink: 0, background: '#ef4444', opacity: l.marker ? 0.7 : 0, boxShadow: l.marker ? '0 0 6px rgba(239,68,68,.4)' : undefined }}/>
-                <div style={{ fontSize: 11, color: '#252525', padding: '0 8px', minWidth: 36, textAlign: 'right', lineHeight: '22px', userSelect: 'none' }}>{40 + i}</div>
-                <div style={{ width: 14, textAlign: 'center', lineHeight: '22px', flexShrink: 0, color: l.signC, fontSize: 12 }}>{l.sign}</div>
-                <div style={{ padding: '0 8px', lineHeight: '22px', whiteSpace: 'pre', color: l.codeC, fontSize: 11 }}>{l.code}</div>
+              <div key={i} style={{ display: 'flex', alignItems: 'stretch', minHeight: 24, background: l.bg }}>
+                <div style={{ width: 3, flexShrink: 0, background: '#ef4444', opacity: l.marker ? 0.85 : 0, boxShadow: l.marker ? '0 0 8px rgba(239,68,68,.5)' : undefined }}/>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.18)', padding: '0 12px', minWidth: 44, textAlign: 'right', lineHeight: '24px', userSelect: 'none' }}>{40 + i}</div>
+                <div style={{ width: 16, textAlign: 'center', lineHeight: '24px', flexShrink: 0, color: l.signC, fontSize: 13 }}>{l.sign}</div>
+                <div style={{ padding: '0 10px', lineHeight: '24px', whiteSpace: 'pre', color: l.codeC, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.code}</div>
               </div>
             ))}
           </div>
         </div>
-        <div ref={cardRef} style={{ flex: '0 0 45%', minWidth: 0, padding: 20, display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-          <div className={`demo-card-hidden${cardVisible ? ' demo-card-visible' : ''}`}
-            style={{ width: '100%', minWidth: 0, background: '#111111', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '14px 15px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: '#ef4444', boxShadow: '0 0 8px rgba(239,68,68,.3)' }}/>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 4, padding: '2px 7px', marginBottom: 9 }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }}/>
-              <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: '#ef4444' }}>HIGH</span>
+        {/* Right: warning card */}
+        <div style={{ padding: 28, display: 'flex', alignItems: 'center', background: 'linear-gradient(180deg, rgba(239,68,68,.04) 0%, transparent 80%)' }}>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-120px' }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            style={{ width: '100%', background: '#0a0a0a', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '20px 22px', position: 'relative', overflow: 'hidden', fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: '#ef4444', boxShadow: '0 0 12px rgba(239,68,68,.4)' }}/>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 5, padding: '3px 9px', marginBottom: 14 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }}/>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: '#ef4444' }}>HIGH</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#e0e0e8', lineHeight: 1.4, marginBottom: 7 }}>Async iterator cleanup removed — resource leak under task cancellation</div>
-            <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 10.5, color: '#333333', marginBottom: 10 }}>langchain/callbacks/manager.py<span style={{ color: '#252525' }}>:350</span></div>
-            <div style={{ fontSize: 12, color: '#444444', lineHeight: 1.6, marginBottom: 11 }}>Removing the try/finally block that called handler.aclose() mirrors the pattern that caused file handles and HTTP connections to leak in the v0.0.318 regression.</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#333333' }}>
-              <Icon name="gitBranch" size={11} stroke="#333333"/>
-              <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 10.5, color: '#404040' }}>c891de3</span>
-              <span style={{ color: '#252525' }}>·</span>
-              <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>fix: ensure astream cleanup on generator cancellation</span>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#ffffff', lineHeight: 1.3, marginBottom: 10, letterSpacing: '-0.01em' }}>
+              Async iterator cleanup removed — resource leak under task cancellation
             </div>
-          </div>
+            <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 14 }}>
+              langchain/callbacks/manager.py<span style={{ color: 'rgba(255,255,255,.25)' }}>:350</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', lineHeight: 1.65, marginBottom: 16 }}>
+              Removing the try/finally block that called handler.aclose() mirrors the pattern that caused file handles and HTTP connections to leak in the v0.0.318 regression.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+              <Icon name="gitBranch" size={13} stroke="rgba(255,255,255,.45)"/>
+              <span style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, color: '#ef4444' }}>c891de3</span>
+              <span style={{ color: 'rgba(255,255,255,.2)' }}>·</span>
+              <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>fix: ensure astream cleanup on generator cancellation</span>
+            </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </section>
   )
 }
@@ -614,13 +859,27 @@ function DemoSection() {
 
 function LandingFooter() {
   return (
-    <footer style={{ borderTop: '1px solid #1a1a1a', padding: '20px 32px', textAlign: 'center' }}>
-      <p style={{ fontSize: 12, color: '#2e2e2e', margin: 0 }}>
-        Powered by Claude + Nia&nbsp;&nbsp;·&nbsp;&nbsp;
-        <a href="https://github.com/ShivamSinghNow/scartissue" target="_blank" rel="noopener" style={{ color: '#333333', textDecoration: 'none', fontFamily: 'var(--font-fira-code, monospace)', fontSize: 11.5, transition: 'color .12s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#666')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#333333')}>
-          github.com/ShivamSinghNow/scartissue
+    <footer style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '60px 32px 40px', textAlign: 'center', maxWidth: 1140, margin: '0 auto', fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+        <LandingLogo/>
+      </div>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,.35)', margin: '0 0 24px', fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic' }}>
+        Every codebase remembers its bugs.
+      </p>
+      <p style={{ marginTop: 0, fontSize: 13, color: 'rgba(255,255,255,.4)', fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic', letterSpacing: '0.01em' }}>
+        built by{' '}
+        <a href="https://www.soharshh.com/" target="_blank" rel="noopener"
+          style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,.2)', transition: 'color .15s, border-color .15s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderBottomColor = 'rgba(239,68,68,.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.7)'; e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,.2)' }}>
+          Harsh
+        </a>
+        {' '}&amp;{' '}
+        <a href="https://shivam-singh.dev/" target="_blank" rel="noopener"
+          style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,.2)', transition: 'color .15s, border-color .15s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderBottomColor = 'rgba(239,68,68,.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.7)'; e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,.2)' }}>
+          Shivam
         </a>
       </p>
     </footer>
@@ -628,20 +887,72 @@ function LandingFooter() {
 }
 
 function LandingPage({ onLaunch }: { onLaunch: () => void }) {
+  // Buttery smooth wheel/touchpad scrolling. Native CSS scroll-behavior only
+  // applies to anchor jumps; Lenis intercepts wheel events for the same
+  // ease-out feel on every flick.
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.1,
+      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      lerp: 0.1,
+    })
+    let raf = 0
+    const tick = (time: number) => {
+      lenis.raf(time)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      lenis.destroy()
+    }
+  }, [])
+
   return (
-    <div>
+    <div style={{ background: '#000000', color: '#ffffff', overflowX: 'hidden' }}>
       <LandingNav onLaunch={onLaunch}/>
-      <div style={{ paddingTop: 48 }}>
-        <HeroSection onLaunch={onLaunch}/>
-        <div style={{ borderTop: '1px solid #111111' }}/>
-        <HowItWorks/>
-        <div style={{ borderTop: '1px solid #111111' }}/>
-        <InstallSection onLaunch={onLaunch}/>
-        <div style={{ borderTop: '1px solid #111111' }}/>
-        <DemoSection/>
-        <div style={{ borderTop: '1px solid #111111' }}/>
-        <WhereYouWork/>
-        <LandingFooter/>
+      <HeroSection onLaunch={onLaunch}/>
+      {/* Continuous black surface — sections sit on a single canvas with
+          drifting ambient glows, a slow grid drift, and vertical scan
+          beams so scrolling past the hero never feels like dead black. */}
+      <div style={{ background: '#000000', position: 'relative', overflow: 'hidden' }}>
+        {/* Drifting ambient red glows (CSS-driven, slow, never sync) */}
+        <div className="bg-blob-1"
+          style={{ position: 'absolute', top: '6%', left: '-10%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.18) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(80px)', mixBlendMode: 'screen' }}/>
+        <div className="bg-blob-2"
+          style={{ position: 'absolute', top: '36%', right: '-14%', width: 580, height: 580, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,20,20,.20) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(90px)', mixBlendMode: 'screen' }}/>
+        <div className="bg-blob-3"
+          style={{ position: 'absolute', top: '66%', left: '12%', width: 440, height: 440, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.14) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(80px)', mixBlendMode: 'screen' }}/>
+
+        {/* Slowly drifting + pulsing grid for ambient depth */}
+        <div className="bg-grid bg-grid-pulse"
+          style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+            maskImage: 'radial-gradient(ellipse 80% 50% at 50% 30%, black 30%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 50% at 50% 30%, black 30%, transparent 80%)',
+          }}/>
+
+        {/* Vertical scan beams — three offset so one is always crossing the viewport */}
+        <div className="bg-scan-beam"
+          style={{ position: 'absolute', top: 0, left: '22%', width: 1, height: 200, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.6), transparent)', boxShadow: '0 0 12px rgba(239,68,68,.4)' }}/>
+        <div className="bg-scan-beam delay-1"
+          style={{ position: 'absolute', top: 0, left: '64%', width: 1, height: 160, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.5), transparent)', boxShadow: '0 0 10px rgba(239,68,68,.35)' }}/>
+        <div className="bg-scan-beam delay-2"
+          style={{ position: 'absolute', top: 0, left: '85%', width: 1, height: 240, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.45), transparent)', boxShadow: '0 0 10px rgba(239,68,68,.3)' }}/>
+
+        {/* Top-edge fade so the hero's dark bottom blends seamlessly into this canvas */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, pointerEvents: 'none', background: 'linear-gradient(to bottom, #000000 0%, transparent 100%)' }}/>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <HowItWorks/>
+          <InstallSection onLaunch={onLaunch}/>
+          <DemoSection/>
+          <WhereYouWork/>
+          <LandingFooter/>
+        </div>
       </div>
     </div>
   )
