@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'motion/react'
 import Hls from 'hls.js'
 import Lenis from 'lenis'
-import { ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 /* ══════════════════════════════════════════════════════════
    TYPES
@@ -265,15 +265,12 @@ function LandingNav({ onLaunch }: { onLaunch: () => void }) {
       <div className="flex items-center justify-between">
         <LandingLogo/>
         <div className="hidden md:flex items-center gap-8" style={{ fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
-          <a href="#how" className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1">
-            Product <ChevronDown size={14} strokeWidth={1.5}/>
-          </a>
-          <a href="#demo" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Demo</a>
+          <a href="#how" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Product</a>
           <a href="#install" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Install</a>
-          <a href="https://github.com/ShivamSinghNow/scartissue" target="_blank" rel="noopener" className="text-sm font-medium text-white/80 hover:text-white transition-colors">GitHub</a>
+          <a href="#demo" className="text-sm font-medium text-white/80 hover:text-white transition-colors">Demo</a>
+          <a href="https://github.com/ShivamSinghNow/ScarTissueOpenClawHackathon" target="_blank" rel="noopener" className="text-sm font-medium text-white/80 hover:text-white transition-colors">GitHub</a>
         </div>
         <div className="flex items-center gap-4" style={{ fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
-          <a href="#install" className="hidden sm:block text-sm font-medium text-white/80 hover:text-white transition-colors">Book A Demo</a>
           <button onClick={onLaunch}
             className="bg-white text-black rounded-full font-semibold transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.25)]"
             style={{ padding: '10px 20px', fontSize: 14, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
@@ -866,19 +863,25 @@ function LandingFooter() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
         <LandingLogo/>
       </div>
-      <p style={{ fontSize: 13, color: 'rgba(255,255,255,.35)', margin: '0 0 8px', fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic' }}>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,.35)', margin: '0 0 24px', fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic' }}>
         Every codebase remembers its bugs.
       </p>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 18, flexWrap: 'wrap' }}>
-        <a href="https://github.com/ShivamSinghNow/scartissue" target="_blank" rel="noopener"
-          style={{ color: 'rgba(255,255,255,.45)', textDecoration: 'none', fontFamily: 'var(--font-fira-code, monospace)', fontSize: 12, transition: 'color .12s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.85)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.45)')}>
-          github.com/ShivamSinghNow/scartissue
+      <p style={{ marginTop: 0, fontSize: 13, color: 'rgba(255,255,255,.4)', fontFamily: 'var(--font-instrument-serif, serif)', fontStyle: 'italic', letterSpacing: '0.01em' }}>
+        built by{' '}
+        <a href="https://www.soharshh.com/" target="_blank" rel="noopener"
+          style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,.2)', transition: 'color .15s, border-color .15s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderBottomColor = 'rgba(239,68,68,.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.7)'; e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,.2)' }}>
+          Harsh
         </a>
-        <span style={{ color: 'rgba(255,255,255,.15)' }}>·</span>
-        <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 12 }}>v0.1.0 — open beta</span>
-      </div>
+        {' '}&amp;{' '}
+        <a href="https://shivam-singh.dev/" target="_blank" rel="noopener"
+          style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,.2)', transition: 'color .15s, border-color .15s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderBottomColor = 'rgba(239,68,68,.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.7)'; e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,.2)' }}>
+          Shivam
+        </a>
+      </p>
     </footer>
   )
 }
@@ -910,13 +913,38 @@ function LandingPage({ onLaunch }: { onLaunch: () => void }) {
     <div style={{ background: '#000000', color: '#ffffff', overflowX: 'hidden' }}>
       <LandingNav onLaunch={onLaunch}/>
       <HeroSection onLaunch={onLaunch}/>
-      {/* Continuous black surface — sections separated by ambient red glows
-          rather than hard borders, so scrolling feels like one canvas. */}
+      {/* Continuous black surface — sections sit on a single canvas with
+          drifting ambient glows, a slow grid drift, and vertical scan
+          beams so scrolling past the hero never feels like dead black. */}
       <div style={{ background: '#000000', position: 'relative', overflow: 'hidden' }}>
-        {/* Ambient glows interleaved with sections for depth without breaking the canvas */}
-        <div style={{ position: 'absolute', top: '8%', left: '-10%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.06) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }}/>
-        <div style={{ position: 'absolute', top: '38%', right: '-12%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,20,20,.07) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(50px)' }}/>
-        <div style={{ position: 'absolute', top: '68%', left: '15%', width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.05) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }}/>
+        {/* Drifting ambient red glows (CSS-driven, slow, never sync) */}
+        <div className="bg-blob-1"
+          style={{ position: 'absolute', top: '6%', left: '-10%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.18) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(80px)', mixBlendMode: 'screen' }}/>
+        <div className="bg-blob-2"
+          style={{ position: 'absolute', top: '36%', right: '-14%', width: 580, height: 580, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,20,20,.20) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(90px)', mixBlendMode: 'screen' }}/>
+        <div className="bg-blob-3"
+          style={{ position: 'absolute', top: '66%', left: '12%', width: 440, height: 440, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,.14) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(80px)', mixBlendMode: 'screen' }}/>
+
+        {/* Slowly drifting + pulsing grid for ambient depth */}
+        <div className="bg-grid bg-grid-pulse"
+          style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+            maskImage: 'radial-gradient(ellipse 80% 50% at 50% 30%, black 30%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 50% at 50% 30%, black 30%, transparent 80%)',
+          }}/>
+
+        {/* Vertical scan beams — three offset so one is always crossing the viewport */}
+        <div className="bg-scan-beam"
+          style={{ position: 'absolute', top: 0, left: '22%', width: 1, height: 200, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.6), transparent)', boxShadow: '0 0 12px rgba(239,68,68,.4)' }}/>
+        <div className="bg-scan-beam delay-1"
+          style={{ position: 'absolute', top: 0, left: '64%', width: 1, height: 160, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.5), transparent)', boxShadow: '0 0 10px rgba(239,68,68,.35)' }}/>
+        <div className="bg-scan-beam delay-2"
+          style={{ position: 'absolute', top: 0, left: '85%', width: 1, height: 240, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, rgba(239,68,68,.45), transparent)', boxShadow: '0 0 10px rgba(239,68,68,.3)' }}/>
+
+        {/* Top-edge fade so the hero's dark bottom blends seamlessly into this canvas */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, pointerEvents: 'none', background: 'linear-gradient(to bottom, #000000 0%, transparent 100%)' }}/>
 
         <div style={{ position: 'relative', zIndex: 1 }}>
           <HowItWorks/>
