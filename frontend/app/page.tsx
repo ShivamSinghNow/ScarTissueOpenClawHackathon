@@ -1054,7 +1054,8 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
   }
 
   const scrollCardToIdx = useCallback((idx: number) => {
-    scrollWindowToEl(cardRefs.current[idx])
+    // Right panel is its own scroll surface; scrollIntoView walks to the nearest scrollable ancestor.
+    cardRefs.current[idx]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [])
 
   const scrollHunkToIdx = useCallback((idx: number) => {
@@ -1257,8 +1258,8 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
           ))}
         </div>
 
-        {/* Right: warning cards — grow to fit; page handles scrolling */}
-        <div ref={rightRef} style={{ width: '40%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a' }}>
+        {/* Right: warning cards — sticky, with its own scrollbar so the user can scroll through all warnings while the left rail stays in view */}
+        <div ref={rightRef} style={{ width: '40%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a', position: 'sticky', top: 113, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 113px)', overflowY: 'auto' }}>
           {(postResult || postError) && (
             <div style={{ background: postResult ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.07)', border: `1px solid ${postResult ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.2)'}`, borderRadius: 7, padding: '9px 10px', fontSize: 11.5, color: postResult ? '#6fcf7f' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               {postResult ? (
