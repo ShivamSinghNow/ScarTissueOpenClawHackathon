@@ -138,8 +138,7 @@ const MCP_CONFIGS: Record<string, { lang: string; path: string; content: string 
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-...",
         "NIA_API_KEY": "nia_...",
-        "GITHUB_TOKEN": "ghp_...",
-        "CHROMA_PERSIST_DIR": "/absolute/path/to/scartissue/backend/chroma_db"
+        "GITHUB_TOKEN": "ghp_..."
       }
     }
   }
@@ -154,8 +153,7 @@ command = "scartissue-mcp"
 [scartissue.env]
 ANTHROPIC_API_KEY = "sk-ant-..."
 NIA_API_KEY = "nia_..."
-GITHUB_TOKEN = "ghp_..."
-CHROMA_PERSIST_DIR = "/absolute/path/to/scartissue/backend/chroma_db"`,
+GITHUB_TOKEN = "ghp_..."`,
   },
   gemini: {
     lang: 'json',
@@ -168,8 +166,7 @@ CHROMA_PERSIST_DIR = "/absolute/path/to/scartissue/backend/chroma_db"`,
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-...",
         "NIA_API_KEY": "nia_...",
-        "GITHUB_TOKEN": "ghp_...",
-        "CHROMA_PERSIST_DIR": "/absolute/path/to/scartissue/backend/chroma_db"
+        "GITHUB_TOKEN": "ghp_..."
       }
     }
   }
@@ -479,7 +476,7 @@ function HeroSection({ onLaunch }: { onLaunch: () => void }) {
             margin: 0,
           }}
         >
-          indexed across langchain-ai/langchain&nbsp;&nbsp;·&nbsp;&nbsp;encode/httpx&nbsp;&nbsp;·&nbsp;&nbsp;catches regressions before they merge
+          2,940 incidents indexed across LangChain, Next.js, FastAPI, OpenAI, Anthropic SDK, and LangChainJS&nbsp;&nbsp;·&nbsp;&nbsp;catches regressions before they merge
         </motion.p>
       </div>
 
@@ -623,6 +620,26 @@ function InstallSection({ onLaunch }: { onLaunch: () => void }) {
           viewport={{ once: true, margin: '-100px' }}
           transition={{ duration: 0.55 }}
           style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '16px 18px', marginBottom: 16, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+              <p style={{ color: 'rgba(255,255,255,.72)', fontSize: 13, lineHeight: 1.55, margin: 0 }}>
+                Prerequisites: Install via pip, then grab three API keys.
+              </p>
+              <a
+                href="https://pypi.org/project/scartissue-mcp/"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#ef4444', textDecoration: 'none', fontSize: 12, fontFamily: 'var(--font-fira-code, monospace)' }}>
+                Available on PyPI
+              </a>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.8 }}>
+              <li><code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.78)' }}>pip install scartissue-mcp</code></li>
+              <li>Anthropic API key from <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,.78)', textDecoration: 'none' }}>console.anthropic.com</a></li>
+              <li>Nia API key from <a href="https://app.trynia.ai" target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,.78)', textDecoration: 'none' }}>app.trynia.ai</a> <span style={{ color: 'rgba(255,255,255,.36)' }}>(free tier available)</span></li>
+              <li>GitHub personal access token from <a href="https://github.com/settings/tokens" target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,.78)', textDecoration: 'none' }}>github.com/settings/tokens</a></li>
+            </ol>
+          </div>
           <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, alignSelf: 'flex-start', marginBottom: 16, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
@@ -672,9 +689,17 @@ function InstallSection({ onLaunch }: { onLaunch: () => void }) {
               ))}
             </pre>
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 14, lineHeight: 1.65, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
-            Prerequisites: clone ScarTissue, run <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>uv pip install -e .</code> from <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>backend/</code>, then populate <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>backend/.env</code>. The <code style={{ fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.7)' }}>scartissue-mcp</code> command becomes available globally after install.
-          </p>
+          <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '14px 16px', marginTop: 14, fontFamily: 'var(--font-instrument-sans, sans-serif)' }}>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', margin: 0, lineHeight: 1.7 }}>
+              After installing, ask your agent to index a repo first:
+            </p>
+            <code style={{ display: 'block', fontFamily: 'var(--font-fira-code, monospace)', color: 'rgba(255,255,255,.78)', fontSize: 12.5, marginTop: 8, marginBottom: 8 }}>
+              "index langchain-ai/langchain using scartissue"
+            </code>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,.42)', margin: 0, lineHeight: 1.7 }}>
+              Indexing takes 5-15 minutes per repo and only needs to be done once. You can also try the web interface above for instant access to pre-indexed repos.
+            </p>
+          </div>
         </motion.div>
 
         {/* Right: launch the web interface */}
