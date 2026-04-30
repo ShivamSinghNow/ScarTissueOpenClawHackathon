@@ -15,14 +15,14 @@ router = APIRouter()
 
 
 @router.post("/review", response_model=ReviewResponse)
-@limiter.limit("3/day")
+@limiter.limit("10/day")
 async def review_pr(
     request: Request,
     response: Response,
     payload: PRReviewRequest,
 ) -> ReviewResponse:
     start = time.time()
-    reserve_daily_capacity("review", 100)
+    reserve_daily_capacity("review", 300)
     try:
         fetcher = PRFetcher()
         pr = fetcher.fetch(payload.pr_url)
