@@ -35,3 +35,7 @@ node_modules/
 .next/
 backend/demo_kit_langchain_small/
 backend/.env.bak
+frontend/.env.bak
+frontend/.env.local
+frontend/.env
+frontend/.env.production

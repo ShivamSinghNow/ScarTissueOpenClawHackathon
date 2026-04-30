@@ -5,11 +5,12 @@ import re
 import sys
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from github import Github, GithubException
 from pydantic import BaseModel, field_validator
 
 from app.models.schemas import Warning, _sanitize_pr_url
+from app.rate_limits import limiter
 
 router = APIRouter()
 
@@ -172,17 +173,22 @@ def _build_post_plan(repo_slug: str, warnings: list[Warning], changed_lines: dic
 
 
 @router.post("/post-to-github", response_model=PostToGithubResponse)
-async def post_to_github(request: PostToGithubRequest) -> PostToGithubResponse:
-    repo_slug, number = _parse_pr_url(request.pr_url)
+@limiter.limit("5/day")
+async def post_to_github(
+    request: Request,
+    response: Response,
+    payload: PostToGithubRequest,
+) -> PostToGithubResponse:
+    repo_slug, number = _parse_pr_url(payload.pr_url)
     summary = (
         f"ScarTissue analyzed this PR against {repo_slug}'s historical bug fixes and found "
-        f"{len(request.warnings)} potential regression pattern(s). See inline comments for details."
+        f"{len(payload.warnings)} potential regression pattern(s). See inline comments for details."
     )
 
-    if request.dry_run:
-        _, posted, _ = _build_post_plan(repo_slug, request.warnings, changed_lines=None)
+    if payload.dry_run:
+        _, posted, _ = _build_post_plan(repo_slug, payload.warnings, changed_lines=None)
         return PostToGithubResponse(
-            pr_url=request.pr_url,
+            pr_url=payload.pr_url,
             review_url=None,
             total_comments=len(posted),
             posted=posted,
@@ -198,7 +204,7 @@ async def post_to_github(request: PostToGithubRequest) -> PostToGithubResponse:
         repo = gh.get_repo(repo_slug)
         pr = repo.get_pull(number)
         changed_lines = {file.filename: _patch_new_lines(file.patch) for file in pr.get_files()}
-        review_comments, posted, fallback_comments = _build_post_plan(repo_slug, request.warnings, changed_lines)
+        review_comments, posted, fallback_comments = _build_post_plan(repo_slug, payload.warnings, changed_lines)
 
         review_url: str | None = None
         if review_comments:
@@ -227,7 +233,7 @@ async def post_to_github(request: PostToGithubRequest) -> PostToGithubResponse:
             pr.create_issue_comment(body)
 
         return PostToGithubResponse(
-            pr_url=request.pr_url,
+            pr_url=payload.pr_url,
             review_url=review_url,
             total_comments=len(posted),
             posted=posted,

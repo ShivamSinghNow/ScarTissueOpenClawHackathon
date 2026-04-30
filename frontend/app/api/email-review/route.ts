@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:8000'
+const BACKEND = process.env.BACKEND_URL
 
 export async function POST(req: NextRequest) {
+  if (!BACKEND) {
+    return NextResponse.json({ error: 'BACKEND_URL is not configured' }, { status: 500 })
+  }
+
   const body = await req.json()
   const upstream = await fetch(`${BACKEND}/email-review`, {
     method: 'POST',
