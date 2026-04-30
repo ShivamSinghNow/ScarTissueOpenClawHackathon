@@ -347,7 +347,7 @@ async function postWarningsToGithub(prUrl: string, warnings: Warning[], token: s
         comments: anchored,
       }),
     })
-    if (reviewResponse.status === 201) {
+    if (reviewResponse.ok) {
       const review = await reviewResponse.json().catch(() => null) as { html_url?: string } | null
       reviewUrl = review?.html_url ?? `https://github.com/${pr.repoSlug}/pull/${pr.number}`
     } else if (reviewResponse.status === 422) {
