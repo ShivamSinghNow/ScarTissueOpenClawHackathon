@@ -1258,7 +1258,7 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
   return (
     <div ref={cardRef} className={`wcard ${active ? 'wactive' : ''}`}
       onMouseEnter={onActivate}
-      style={{ background: '#0f0f0f', border: `1px solid ${active ? 'rgba(239,68,68,.2)' : '#1a1a1a'}`, borderRadius: 8, padding: '13px 14px', minWidth: 0, overflow: 'hidden' }}>
+      style={{ background: '#0f0f0f', border: `1px solid ${active ? 'rgba(239,68,68,.2)' : '#1a1a1a'}`, borderRadius: 8, padding: '13px 14px', minWidth: 0, maxHeight: 'calc(100vh - 145px)', overflowX: 'hidden', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 4, padding: '2px 7px' }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.dot, flexShrink: 0 }}/>
@@ -1292,7 +1292,7 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
       </div>
 
       {w.proposed_fix && (
-        <div style={{ marginBottom: 9, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 5, padding: '8px 10px', minWidth: 0 }}>
+        <div style={{ marginBottom: 9, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 5, padding: '8px 10px', minWidth: 0, maxHeight: 'min(42vh, 360px)', overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#333333', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Suggested fix</div>
           <pre style={{ fontSize: 11.5, color: '#9ec79e', lineHeight: 1.55, fontFamily: 'var(--font-fira-code, monospace)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{w.proposed_fix}</pre>
         </div>
@@ -1539,7 +1539,7 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         ))}
       </div>
 
-      {/* Split pane — no internal scrolling; the page itself is the scroll surface */}
+      {/* Split pane — the page can scroll for the left rail; the right rail keeps its own card list scrollbar. */}
       <div style={{ display: 'flex', alignItems: 'flex-start' }}>
         {/* Left: hunk references */}
         <div ref={leftRef} style={{ width: '60%', borderRight: '1px solid #1a1a1a' }}>
@@ -1595,7 +1595,7 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         </div>
 
         {/* Right: warning cards — sticky, with its own scrollbar so the user can scroll through all warnings while the left rail stays in view */}
-        <div ref={rightRef} style={{ width: '40%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a', position: 'sticky', top: 113, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 113px)', overflowY: 'auto' }}>
+        <div ref={rightRef} style={{ width: '40%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: '#0a0a0a', position: 'sticky', top: 113, alignSelf: 'flex-start', height: 'calc(100vh - 113px)', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           {(postResult || postError) && (
             <div style={{ background: postResult ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.07)', border: `1px solid ${postResult ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.2)'}`, borderRadius: 7, padding: '9px 10px', fontSize: 11.5, color: postResult ? '#6fcf7f' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               {postResult ? (
@@ -1819,7 +1819,9 @@ export default function Root() {
       {view === 'landing' && <LandingPage onLaunch={() => setView('empty')}/>}
 
       {isApp && (
-        <div style={{ height: '100vh', overflow: 'hidden' }}>
+        <div style={view === 'results'
+          ? { minHeight: '100vh', overflowX: 'hidden' }
+          : { height: '100vh', overflow: 'hidden' }}>
           <AppHeader
             view={view}
             onHome={() => setView('landing')}
