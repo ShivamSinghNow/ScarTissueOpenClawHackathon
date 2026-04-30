@@ -1,13 +1,7 @@
-import { NextResponse } from 'next/server'
+import { proxyBackend } from '../_backend'
 
-const BACKEND = process.env.BACKEND_URL
+export const maxDuration = 300
 
 export async function GET() {
-  if (!BACKEND) {
-    return NextResponse.json({ error: 'BACKEND_URL is not configured' }, { status: 500 })
-  }
-
-  const upstream = await fetch(`${BACKEND}/repos`)
-  const data = await upstream.json()
-  return NextResponse.json(data, { status: upstream.status })
+  return proxyBackend('/repos')
 }
