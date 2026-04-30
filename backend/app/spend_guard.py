@@ -7,7 +7,7 @@ from typing import Any
 
 SPEND_LIMIT_MESSAGE = "ScarTissue is taking a break to manage costs. Try again tomorrow."
 
-DAILY_SPEND_LIMIT_USD = 25.0
+DAILY_SPEND_LIMIT_USD = 50.0
 SONNET_45_INPUT_USD_PER_MTOK = 3.0
 SONNET_45_OUTPUT_USD_PER_MTOK = 15.0
 

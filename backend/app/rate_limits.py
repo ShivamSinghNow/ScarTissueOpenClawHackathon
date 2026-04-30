@@ -9,6 +9,11 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 DAILY_LIMIT_MESSAGE = "Daily limit reached, try again tomorrow."
+REVIEW_RATE_LIMIT_RESPONSE = {
+    "error": "Daily limit reached for this IP",
+    "message": "You've hit the daily limit on the hosted demo. Install ScarTissue locally for unlimited reviews: pip install scartissue-mcp",
+    "install_url": "https://pypi.org/project/scartissue-mcp/",
+}
 
 limiter = Limiter(key_func=get_remote_address, headers_enabled=True)
 
