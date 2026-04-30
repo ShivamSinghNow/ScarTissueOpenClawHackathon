@@ -50,8 +50,24 @@ interface ReviewResponse {
 interface PostToGithubResponse {
   pr_url: string
   review_url: string | null
+  github_url: string | null
   total_comments: number
+  anchored_comments: number
+  fallback_comments: number
   summary_comment: string
+}
+
+interface GithubAuthState {
+  token: string | null
+  username: string | null
+  scopes: string[] | null
+}
+
+interface ParsedPrUrl {
+  owner: string
+  repo: string
+  repoSlug: string
+  number: number
 }
 
 interface EmailReviewResponse {
@@ -93,6 +109,9 @@ const LOADING_STEPS = [
 ]
 
 const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+const GITHUB_TOKEN_KEY = 'scartissue_github_token'
+const GITHUB_USERNAME_KEY = 'scartissue_github_username'
+const GITHUB_SCOPES_KEY = 'scartissue_github_scopes'
 
 function normalizeRepo(repo: string): string {
   return repo.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, '')
@@ -101,6 +120,17 @@ function normalizeRepo(repo: string): string {
 function repoFromPrUrl(url: string): string | null {
   const match = url.match(/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/\d+/)
   return match ? `${match[1]}/${match[2]}` : null
+}
+
+function parsePrUrl(url: string): ParsedPrUrl | null {
+  const match = url.match(/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/)
+  if (!match) return null
+  return {
+    owner: match[1],
+    repo: match[2],
+    repoSlug: `${match[1]}/${match[2]}`,
+    number: Number(match[3]),
+  }
 }
 
 function formatRelativeTime(value: string | null): string {
@@ -180,6 +210,173 @@ function extractLineRange(hunkHeader: string): string {
   const start = parseInt(m[1])
   const len = m[2] ? parseInt(m[2]) : 1
   return len <= 1 ? `${start}` : `${start}–${start + len - 1}`
+}
+
+function anchorLineFromHunk(hunkHeader: string): number | null {
+  const match = hunkHeader.match(/@@ [+-]\d+(?:,\d+)? [+-](\d+)(?:,(\d+))? @@/)
+  if (!match) return null
+  const start = Number(match[1])
+  const length = match[2] ? Number(match[2]) : 1
+  if (!Number.isFinite(start) || !Number.isFinite(length)) return null
+  return start + Math.floor(length / 2)
+}
+
+function patchNewLines(patch: string | null | undefined): Set<number> {
+  const lines = new Set<number>()
+  if (!patch) return lines
+  let newLine: number | null = null
+  for (const patchLine of patch.split('\n')) {
+    const hunk = patchLine.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunk) {
+      newLine = Number(hunk[1])
+      continue
+    }
+    if (newLine === null || patchLine.startsWith('\\')) continue
+    if (patchLine.startsWith('+')) {
+      lines.add(newLine)
+      newLine += 1
+    } else if (patchLine.startsWith(' ')) {
+      lines.add(newLine)
+      newLine += 1
+    }
+  }
+  return lines
+}
+
+function githubHeaders(token: string): HeadersInit {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `token ${token}`,
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+}
+
+function githubUserMessage(status: number): string {
+  if (status === 403) return 'No write access to this repository, or this token is rate limited.'
+  if (status === 404) return 'PR not found, or this token cannot access the repository.'
+  if (status === 422) return 'GitHub could not place one or more inline comments on this diff.'
+  return `GitHub error ${status}. Try again.`
+}
+
+function warningMarkdown(repoSlug: string, warning: Warning): string {
+  const incident = warning.matched_incident
+  const fullSha = incident?.commit_sha ?? 'unknown'
+  const shortSha = fullSha === 'unknown' ? 'unknown' : fullSha.slice(0, 7)
+  const firstLine = incident?.commit_message?.split('\n')[0] || 'Matched historical incident'
+  const suggestedFix = warning.proposed_fix
+    ? `\n**Suggested fix:**\n\`\`\`\n${warning.proposed_fix}\n\`\`\`\n`
+    : ''
+
+  return (
+    '⚠️ **ScarTissue: possible regression of historical bug**\n\n' +
+    `This change rhymes with commit [\`${shortSha}\`](https://github.com/${repoSlug}/commit/${fullSha}):\n` +
+    `> ${firstLine}\n\n` +
+    `**Why this matters:** ${warning.explanation}\n` +
+    `${suggestedFix}\n` +
+    `**Severity:** ${warning.severity} · **Confidence:** ${warning.confidence.toLocaleString(undefined, { style: 'percent', maximumFractionDigits: 0 })}\n\n` +
+    '---\n' +
+    '<sub>Posted by [ScarTissue](https://scartissue.vercel.app) — every codebase remembers its bugs.</sub>'
+  )
+}
+
+async function fetchGithubJson<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(githubHeaders(token))
+  if (init.headers) {
+    new Headers(init.headers).forEach((value, key) => headers.set(key, value))
+  }
+  const response = await fetch(url, {
+    ...init,
+    headers,
+  })
+  if (!response.ok) throw new Error(githubUserMessage(response.status))
+  return response.json() as Promise<T>
+}
+
+async function fetchAllPrFiles(repoSlug: string, number: number, token: string): Promise<Array<{ filename: string; patch?: string | null }>> {
+  const files: Array<{ filename: string; patch?: string | null }> = []
+  for (let page = 1; page <= 10; page += 1) {
+    const pageFiles = await fetchGithubJson<Array<{ filename: string; patch?: string | null }>>(
+      `https://api.github.com/repos/${repoSlug}/pulls/${number}/files?per_page=100&page=${page}`,
+      token
+    )
+    files.push(...pageFiles)
+    if (pageFiles.length < 100) break
+  }
+  return files
+}
+
+async function postWarningsToGithub(prUrl: string, warnings: Warning[], token: string): Promise<PostToGithubResponse> {
+  const pr = parsePrUrl(prUrl)
+  if (!pr) throw new Error('Invalid GitHub PR URL.')
+
+  const prMeta = await fetchGithubJson<{ head: { sha: string } }>(
+    `https://api.github.com/repos/${pr.repoSlug}/pulls/${pr.number}`,
+    token
+  )
+  const files = await fetchAllPrFiles(pr.repoSlug, pr.number, token)
+  const changedLines = new Map(files.map(file => [file.filename, patchNewLines(file.patch)]))
+  const summary = (
+    `ScarTissue analyzed this PR against ${pr.repoSlug}'s historical bug fixes and found ` +
+    `${warnings.length} potential regression pattern(s). See comments for details.`
+  )
+
+  const anchored: Array<{ path: string; line: number; side: 'RIGHT'; body: string }> = []
+  const fallback: Array<{ path: string; line: number | null; body: string }> = []
+  for (const warning of warnings) {
+    const line = anchorLineFromHunk(warning.pr_hunk)
+    const body = warningMarkdown(pr.repoSlug, warning)
+    const changed = line === null ? undefined : changedLines.get(warning.pr_file)
+    if (line !== null && changed?.has(line)) {
+      anchored.push({ path: warning.pr_file, line, side: 'RIGHT', body })
+    } else {
+      fallback.push({ path: warning.pr_file, line, body })
+    }
+  }
+
+  let reviewUrl: string | null = null
+  let anchoredCount = anchored.length
+  if (anchored.length > 0) {
+    const reviewResponse = await fetch(`https://api.github.com/repos/${pr.repoSlug}/pulls/${pr.number}/reviews`, {
+      method: 'POST',
+      headers: githubHeaders(token),
+      body: JSON.stringify({
+        commit_id: prMeta.head.sha,
+        body: summary,
+        event: 'COMMENT',
+        comments: anchored,
+      }),
+    })
+    if (reviewResponse.status === 201) {
+      const review = await reviewResponse.json().catch(() => null) as { html_url?: string } | null
+      reviewUrl = review?.html_url ?? `https://github.com/${pr.repoSlug}/pull/${pr.number}`
+    } else if (reviewResponse.status === 422) {
+      fallback.push(...anchored.map(comment => ({ path: comment.path, line: comment.line, body: comment.body })))
+      anchoredCount = 0
+    } else {
+      throw new Error(githubUserMessage(reviewResponse.status))
+    }
+  }
+
+  for (const comment of fallback) {
+    const location = comment.line ? `${comment.path}:${comment.line}` : comment.path
+    const issueResponse = await fetch(`https://api.github.com/repos/${pr.repoSlug}/issues/${pr.number}/comments`, {
+      method: 'POST',
+      headers: githubHeaders(token),
+      body: JSON.stringify({ body: `**ScarTissue warning for \`${location}\`**\n\n${comment.body}` }),
+    })
+    if (issueResponse.status !== 201) throw new Error(githubUserMessage(issueResponse.status))
+  }
+
+  return {
+    pr_url: prUrl,
+    review_url: reviewUrl,
+    github_url: reviewUrl ?? `https://github.com/${pr.repoSlug}/pull/${pr.number}`,
+    total_comments: warnings.length,
+    anchored_comments: anchoredCount,
+    fallback_comments: fallback.length,
+    summary_comment: summary,
+  }
 }
 
 function colorJsonLine(line: string, lang: string): string {
@@ -987,12 +1184,142 @@ function LandingPage({ onLaunch }: { onLaunch: () => void }) {
    APP — header
 ══════════════════════════════════════════════════════════ */
 
-function AppHeader({ view, onHome, indexedRepos, onIndexRepo, onRemoveRepo }: {
+function GitHubSettingsModal({ auth, message, onClose, onValidated, onClear }: {
+  auth: GithubAuthState
+  message: string | null
+  onClose: () => void
+  onValidated: (token: string, username: string, scopes: string[]) => void
+  onClear: () => void
+}) {
+  const [tokenInput, setTokenInput] = useState(auth.token ?? '')
+  const [showToken, setShowToken] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(message)
+  const connected = Boolean(auth.token && auth.username)
+  const hasRepoScope = auth.scopes === null || auth.scopes.includes('repo')
+
+  const validate = async () => {
+    const nextToken = tokenInput.trim()
+    if (!nextToken) {
+      setError('Paste a GitHub token first.')
+      return
+    }
+    setValidating(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `token ${nextToken}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      })
+      if (response.status === 401) {
+        setError("Invalid token. Make sure it has 'repo' scope.")
+        return
+      }
+      if (!response.ok) {
+        setError('Could not validate token. Try again.')
+        return
+      }
+      const body = await response.json() as { login?: string }
+      const scopes = (response.headers.get('X-OAuth-Scopes') ?? '')
+        .split(',')
+        .map(scope => scope.trim())
+        .filter(Boolean)
+      if (!body.login) {
+        setError('Could not validate token. Try again.')
+        return
+      }
+      onValidated(nextToken, body.login, scopes)
+      setNotice(`Connected as ${body.login}.`)
+    } catch {
+      setError('Could not validate token. Try again.')
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  const clear = () => {
+    setTokenInput('')
+    setError(null)
+    setNotice(null)
+    onClear()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.68)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 220 }}>
+      <div style={{ width: 'min(460px, calc(100vw - 32px))', background: '#0f0f0f', border: '1px solid #252525', borderRadius: 10, boxShadow: '0 18px 70px rgba(0,0,0,.5)', padding: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, color: '#e5e5e5', letterSpacing: '-0.01em' }}>GitHub Token</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? '#4faa6a' : '#555555', boxShadow: connected ? '0 0 5px rgba(79,170,106,.5)' : undefined }}/>
+              <span style={{ fontSize: 11.5, color: connected ? '#a8d8a8' : '#777' }}>
+                {connected ? `Connected as ${auth.username}` : 'Not connected'}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close GitHub settings" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, display: 'flex' }}>
+            <Icon name="x" size={14} stroke="currentColor"/>
+          </button>
+        </div>
+
+        {notice && <div style={{ marginBottom: 12, background: 'rgba(168,216,168,.07)', border: '1px solid rgba(168,216,168,.18)', borderRadius: 6, padding: '8px 9px', color: '#a8d8a8', fontSize: 11.5 }}>{notice}</div>}
+        {!hasRepoScope && (
+          <div style={{ marginBottom: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '8px 9px', color: '#f0b060', fontSize: 11.5 }}>
+            Warning: this token doesn't have 'repo' scope. You won't be able to post on private repos.
+          </div>
+        )}
+
+        <label htmlFor="scartissue-github-token" style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Personal access token</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            id="scartissue-github-token"
+            type={showToken ? 'text' : 'password'}
+            value={tokenInput}
+            onChange={e => { setTokenInput(e.target.value); setError(null); setNotice(null) }}
+            placeholder="ghp_..."
+            autoComplete="off"
+            style={{ flex: 1, minWidth: 0, padding: '9px 10px', background: '#0a0a0a', border: '1px solid #252525', borderRadius: 6, color: '#e5e5e5', fontSize: 13, fontFamily: 'var(--font-fira-code, monospace)', outline: 'none' }}
+          />
+          <button type="button" className="btn-outline" onClick={() => setShowToken(v => !v)} style={{ padding: '0 10px', fontSize: 11.5, minWidth: 54 }}>
+            {showToken ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <p style={{ margin: '8px 0 0', color: '#444444', fontSize: 11.5, lineHeight: 1.45 }}>
+          Required to post warnings as comments on GitHub PRs. Token never leaves your browser.
+        </p>
+        <p style={{ margin: '7px 0 12px', color: '#444444', fontSize: 11.5, lineHeight: 1.45 }}>
+          Your token is stored only in your browser and never sent to ScarTissue's servers. We use it directly to call GitHub on your behalf.
+        </p>
+        {error && <div style={{ marginBottom: 12, background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 6, padding: '8px 9px', color: '#ef4444', fontSize: 11.5 }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+          <a href="https://github.com/settings/tokens/new?scopes=repo&description=ScarTissue" target="_blank" rel="noreferrer" style={{ color: '#777', textDecoration: 'none', fontSize: 11.5 }}>
+            How to create a GitHub token →
+          </a>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-outline" onClick={clear} disabled={validating || !auth.token} style={{ padding: '8px 12px', fontSize: 12, opacity: validating || !auth.token ? .5 : 1 }}>Clear token</button>
+            <button className="btn-primary" onClick={validate} disabled={validating} style={{ padding: '8px 12px', fontSize: 12, minWidth: 116, opacity: validating ? .7 : 1 }}>
+              {validating ? 'Validating...' : 'Save & Validate'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AppHeader({ view, onHome, indexedRepos, onIndexRepo, onRemoveRepo, githubAuth, onOpenGithubSettings }: {
   view: View
   onHome: () => void
   indexedRepos: IndexedRepo[]
   onIndexRepo: (repo: string, maxCommits: number) => void
   onRemoveRepo: (repo: string) => void
+  githubAuth: GithubAuthState
+  onOpenGithubSettings: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [indexInput, setIndexInput] = useState('')
@@ -1028,7 +1355,13 @@ function AppHeader({ view, onHome, indexedRepos, onIndexRepo, onRemoveRepo }: {
         <LandingLogo/>
       </button>
       {view !== 'landing' && (
-        <div ref={dropRef} style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={onOpenGithubSettings} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', color: '#555555', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: githubAuth.token && githubAuth.username ? '#4faa6a' : '#555555', flexShrink: 0, boxShadow: githubAuth.token && githubAuth.username ? '0 0 4px rgba(79,170,106,.5)' : undefined }}/>
+            GitHub
+            {githubAuth.username && <span style={{ color: '#333333' }}>@{githubAuth.username}</span>}
+          </button>
+          <div ref={dropRef} style={{ position: 'relative' }}>
           <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', color: '#555555', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: totalIndexed > 0 ? '#4faa6a' : '#555555', flexShrink: 0, boxShadow: totalIndexed > 0 ? '0 0 4px rgba(79,170,106,.5)' : undefined }}/>
             {totalIndexed} repo{totalIndexed !== 1 ? 's' : ''} indexed
@@ -1085,6 +1418,7 @@ function AppHeader({ view, onHome, indexedRepos, onIndexRepo, onRemoveRepo }: {
               </div>
             </div>
           )}
+        </div>
         </div>
       )}
     </div>
@@ -1332,11 +1666,13 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
    APP — results (split: hunk refs on left, warnings on right)
 ══════════════════════════════════════════════════════════ */
 
-function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
+function AppResults({ data, onReset, indexedRepos, onIndexRepo, githubAuth, onOpenGithubSettings }: {
   data: ReviewResponse
   onReset: () => void
   indexedRepos: IndexedRepo[]
   onIndexRepo: (repo: string, maxCommits: number) => void
+  githubAuth: GithubAuthState
+  onOpenGithubSettings: (message?: string) => void
 }) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
   const [activeFile, setActiveFile] = useState(0)
@@ -1410,31 +1746,35 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
     scrollCardToIdx(idx)
   }, [scrollCardToIdx])
 
+  const openPostFlow = useCallback(() => {
+    if (!githubAuth.token || !githubAuth.username) {
+      onOpenGithubSettings('Add your GitHub token to post comments')
+      return
+    }
+    setPostError(null)
+    setConfirmPost(true)
+  }, [githubAuth.token, githubAuth.username, onOpenGithubSettings])
+
   const jumpToFile = (fileIdx: number) => {
     setActiveFile(fileIdx)
     scrollWindowToEl(fileRefs.current[fileIdx])
   }
 
   const handlePostToGithub = useCallback(() => {
+    if (!githubAuth.token || !githubAuth.username) {
+      onOpenGithubSettings('Add your GitHub token to post comments')
+      return
+    }
     setPosting(true)
     setPostError(null)
-    fetch('/api/post-to-github', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pr_url: data.pr_url, warnings: data.warnings }),
-    })
-      .then(async r => {
-        const body = await r.json().catch(() => ({ detail: `Server error ${r.status}` }))
-        if (!r.ok) throw new Error(body.detail || `Server error ${r.status}`)
-        return body as PostToGithubResponse
-      })
+    postWarningsToGithub(data.pr_url, data.warnings, githubAuth.token)
       .then(result => {
         setPostResult(result)
         setConfirmPost(false)
       })
       .catch(err => setPostError(err instanceof Error ? err.message : String(err)))
       .finally(() => setPosting(false))
-  }, [data.pr_url, data.warnings])
+  }, [data.pr_url, data.warnings, githubAuth.token, githubAuth.username, onOpenGithubSettings])
 
   const handleEmail = useCallback(() => {
     if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
@@ -1516,8 +1856,8 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
         </button>
         <button
           disabled={data.warnings.length === 0 || posting || Boolean(postResult)}
-          onClick={() => setConfirmPost(true)}
-          title="Requires GITHUB_TOKEN with PR write access."
+          onClick={openPostFlow}
+          title="Post using your GitHub token stored in this browser."
           className="btn-primary"
           style={{ padding: '6px 11px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, opacity: data.warnings.length === 0 || postResult ? .45 : 1, cursor: data.warnings.length === 0 || postResult ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
           <Icon name="github" size={12}/>
@@ -1600,14 +1940,14 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
             <div style={{ background: postResult ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.07)', border: `1px solid ${postResult ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.2)'}`, borderRadius: 7, padding: '9px 10px', fontSize: 11.5, color: postResult ? '#6fcf7f' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               {postResult ? (
                 <span>
-                  Posted {postResult.total_comments} comment{postResult.total_comments !== 1 ? 's' : ''}{postResult.review_url && (
-                    <> · <a href={postResult.review_url} target="_blank" rel="noreferrer" style={{ color: '#a8d8a8', textDecoration: 'none' }}>View on GitHub</a></>
+                  Posted {postResult.total_comments} comment{postResult.total_comments !== 1 ? 's' : ''} ({postResult.anchored_comments} anchored{postResult.fallback_comments > 0 ? `, ${postResult.fallback_comments} as top-level due to diff scope` : ''}){postResult.github_url && (
+                    <> · <a href={postResult.github_url} target="_blank" rel="noreferrer" style={{ color: '#a8d8a8', textDecoration: 'none' }}>View on GitHub</a></>
                   )}
                 </span>
               ) : (
                 <>
                   <span>{postError}</span>
-                  <button onClick={() => setConfirmPost(true)} style={{ background: 'none', border: 'none', color: '#f0a0a0', cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Retry</button>
+                  <button onClick={openPostFlow} style={{ background: 'none', border: 'none', color: '#f0a0a0', cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>Retry</button>
                 </>
               )}
             </div>
@@ -1654,10 +1994,10 @@ function AppResults({ data, onReset, indexedRepos, onIndexRepo }: {
               <h3 style={{ margin: 0, fontSize: 15, color: '#e5e5e5', letterSpacing: '-0.01em' }}>Post ScarTissue warnings</h3>
             </div>
             <p style={{ margin: '0 0 10px', color: '#a0a0a8', fontSize: 13, lineHeight: 1.5 }}>
-              Post {data.warnings.length} warning{data.warnings.length !== 1 ? 's' : ''} as review comments on this GitHub PR?
+              Post {data.warnings.length} warning{data.warnings.length !== 1 ? 's' : ''} as a review on this PR? You'll be posting from @{githubAuth.username}'s account.
             </p>
             <p style={{ margin: '0 0 16px', color: '#444444', fontSize: 11.5, lineHeight: 1.45 }}>
-              Requires GITHUB_TOKEN with PR write access.
+              ScarTissue will call GitHub directly from this browser using your saved token.
             </p>
             {postError && <div style={{ marginBottom: 12, background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 6, padding: '8px 9px', color: '#ef4444', fontSize: 11.5 }}>{postError}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -1720,6 +2060,9 @@ export default function Root() {
   const [reviewData, setReviewData] = useState<ReviewResponse | null>(null)
   const [error, setError]         = useState<string | null>(null)
   const [indexedRepos, setIndexedRepos] = useState<IndexedRepo[]>([])
+  const [githubAuth, setGithubAuth] = useState<GithubAuthState>({ token: null, username: null, scopes: null })
+  const [githubSettingsOpen, setGithubSettingsOpen] = useState(false)
+  const [githubSettingsMessage, setGithubSettingsMessage] = useState<string | null>(null)
 
   // Persist view in localStorage so refresh stays in app
   useEffect(() => {
@@ -1729,6 +2072,19 @@ export default function Root() {
   useEffect(() => {
     localStorage.setItem('st_view', view === 'landing' ? 'landing' : 'empty')
   }, [view])
+
+  useEffect(() => {
+    try {
+      const token = window.localStorage.getItem(GITHUB_TOKEN_KEY)
+      const username = window.localStorage.getItem(GITHUB_USERNAME_KEY)
+      const scopes = window.localStorage.getItem(GITHUB_SCOPES_KEY)
+      setGithubAuth({
+        token,
+        username,
+        scopes: scopes ? scopes.split(',').map(scope => scope.trim()).filter(Boolean) : null,
+      })
+    } catch { /* localStorage may be disabled */ }
+  }, [])
 
   useEffect(() => {
     fetch('/api/repos')
@@ -1812,6 +2168,29 @@ export default function Root() {
     setIndexedRepos(prev => prev.filter(r => r.repo.toLowerCase() !== repo.toLowerCase()))
   }, [])
 
+  const openGithubSettings = useCallback((message?: string) => {
+    setGithubSettingsMessage(message ?? null)
+    setGithubSettingsOpen(true)
+  }, [])
+
+  const handleGithubValidated = useCallback((token: string, username: string, scopes: string[]) => {
+    setGithubAuth({ token, username, scopes })
+    try {
+      window.localStorage.setItem(GITHUB_TOKEN_KEY, token)
+      window.localStorage.setItem(GITHUB_USERNAME_KEY, username)
+      window.localStorage.setItem(GITHUB_SCOPES_KEY, scopes.join(','))
+    } catch { /* localStorage may be disabled */ }
+  }, [])
+
+  const handleGithubClear = useCallback(() => {
+    setGithubAuth({ token: null, username: null, scopes: null })
+    try {
+      window.localStorage.removeItem(GITHUB_TOKEN_KEY)
+      window.localStorage.removeItem(GITHUB_USERNAME_KEY)
+      window.localStorage.removeItem(GITHUB_SCOPES_KEY)
+    } catch { /* localStorage may be disabled */ }
+  }, [])
+
   const isApp = view !== 'landing'
 
   return (
@@ -1828,7 +2207,18 @@ export default function Root() {
             indexedRepos={indexedRepos}
             onIndexRepo={handleIndexRepo}
             onRemoveRepo={handleRemoveRepo}
+            githubAuth={githubAuth}
+            onOpenGithubSettings={() => openGithubSettings()}
           />
+          {githubSettingsOpen && (
+            <GitHubSettingsModal
+              auth={githubAuth}
+              message={githubSettingsMessage}
+              onClose={() => setGithubSettingsOpen(false)}
+              onValidated={handleGithubValidated}
+              onClear={handleGithubClear}
+            />
+          )}
           {view === 'empty' && (
             <>
               {error && (
@@ -1847,7 +2237,7 @@ export default function Root() {
             <AppLoading prUrl={prUrl} onDone={handleLoadingDone} onError={handleLoadingError}/>
           )}
           {view === 'results' && reviewData && (
-            <AppResults data={reviewData} onReset={() => setView('empty')} indexedRepos={indexedRepos} onIndexRepo={handleIndexRepo}/>
+            <AppResults data={reviewData} onReset={() => setView('empty')} indexedRepos={indexedRepos} onIndexRepo={handleIndexRepo} githubAuth={githubAuth} onOpenGithubSettings={openGithubSettings}/>
           )}
         </div>
       )}
