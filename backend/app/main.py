@@ -14,6 +14,7 @@ from app.rate_limits import REVIEW_RATE_LIMIT_RESPONSE, limiter
 from app.routes.index import router as index_router
 from app.routes.github_post import router as github_post_router
 from app.routes.email_review import router as email_review_router
+from app.routes.post_merge_check import router as post_merge_check_router
 from app.routes.repos import router as repos_router
 from app.routes.review import router as review_router
 
@@ -47,6 +48,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 app.include_router(index_router)
 app.include_router(github_post_router)
 app.include_router(email_review_router)
+app.include_router(post_merge_check_router)
 app.include_router(repos_router)
 app.include_router(review_router)
 
