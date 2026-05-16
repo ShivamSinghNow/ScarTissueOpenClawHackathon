@@ -7,6 +7,7 @@ from app.models.schemas import PRReviewRequest, ReviewResponse
 from app.rate_limits import limiter, reserve_daily_capacity
 from app.services.nia_client import NiaClient
 from app.services.pr_fetcher import PRFetcher
+from app.services.gbrain_client import GBrainClient
 from app.services.reviewer import Reviewer
 from app.services.scar_index import ScarIndex
 from app.spend_guard import SafeAsyncAnthropic, SpendCapExceeded, SPEND_LIMIT_MESSAGE
@@ -30,7 +31,7 @@ async def review_pr(
         scar_index = ScarIndex()
         nia = NiaClient()
         anthropic_client = SafeAsyncAnthropic(AsyncAnthropic())
-        reviewer = Reviewer(scar_index, nia, anthropic_client)
+        reviewer = Reviewer(scar_index, nia, anthropic_client, gbrain_client=GBrainClient())
 
         warnings = await reviewer.review(pr)
 

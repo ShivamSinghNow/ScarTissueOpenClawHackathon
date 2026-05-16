@@ -13,6 +13,10 @@ from app.models.schemas import Incident, Warning
 from app.services.nia_client import NiaClient
 from app.services.pr_fetcher import PRDiff
 from app.services.scar_index import ScarIndex
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.gbrain_client import GBrainClient, BugPattern
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +28,12 @@ MAX_ITERATIONS = 20
 _SYSTEM = """\
 You are ScarTissue, a code review agent. Your job is to detect when a pull request is about to reintroduce a bug pattern that was previously fixed in this repo's history.
 
-You have four tools: search_scar_tissue, get_incident_details, search_current_code, emit_warning.
+You have six tools: search_scar_tissue, get_incident_details, search_current_code, emit_warning, learn_from_incident, search_org_scar_tissue.
 
 Workflow for each hunk in the PR:
 1. Understand what the hunk changes. Identify the pattern it introduces or removes.
 2. Call search_scar_tissue with a descriptive query about the change.
+2b. If search_scar_tissue returns no matches with confidence >= 0.5, call search_org_scar_tissue before concluding no pattern exists — cross-repo GBrain patterns catch things the local index misses. When a GBrain match triggers a warning, pass learned_from="live_warning" to emit_warning.
 3. Examine the returned candidates. Most will be false positives due to surface-level similarity. Filter ruthlessly.
 4. For any candidate that looks genuinely related, call get_incident_details to read the full fix.
 5. Ask: does this PR undo, weaken, or rhyme with the protective change that past fix made?
@@ -45,6 +50,7 @@ Quality bar:
 Output:
 - Emit all findings via emit_warning. Do not write prose explanations outside tool calls.
 - When you have reviewed every significant hunk, respond with a single short final message summarizing how many warnings you emitted.
+8. After emitting a HIGH severity warning, call learn_from_incident exactly once per review session for the single highest-confidence finding. Only for HIGH severity. Do not call it for medium or low warnings — don't learn from noise.
 """
 
 _TOOLS: list[dict] = [
@@ -124,6 +130,15 @@ _TOOLS: list[dict] = [
                         "apply to avoid reintroducing the bug. Omit if you cannot confidently suggest one."
                     ),
                 },
+                "learned_from": {
+                    "type": "string",
+                    "enum": ["git_history", "live_warning", "merge_webhook"],
+                    "description": (
+                        "Optional. Set to 'live_warning' when this warning was triggered by a "
+                        "cross-repo GBrain pattern from search_org_scar_tissue. Omit or leave "
+                        "as 'git_history' for local ChromaDB matches."
+                    ),
+                },
             },
             "required": [
                 "pr_file",
@@ -133,6 +148,57 @@ _TOOLS: list[dict] = [
                 "explanation",
                 "confidence",
             ],
+        },
+    },
+    {
+        "name": "learn_from_incident",
+        "description": (
+            "Write a new BugPattern to the GBrain cross-repo memory when you have fired a "
+            "high-confidence warning. Only call this after emit_warning for HIGH severity findings. "
+            "Normalizes the incident into a structured pattern so future PRs in any repo can match it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "trigger_condition": {"type": "string", "description": "What code shape triggers the bug."},
+                "bad_change_shape": {"type": "string", "description": "What the dangerous PR diff looks like."},
+                "protective_invariant": {"type": "string", "description": "What must stay true to stay safe."},
+                "fix_shape": {"type": "string", "description": "What the fix looks like in code."},
+                "affected_symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Function or class names involved.",
+                },
+                "source_commit": {"type": "string", "description": "The matched_commit_sha from the warning you just emitted."},
+                "confidence": {"type": "number", "description": "Your confidence 0.0-1.0 in this pattern."},
+            },
+            "required": [
+                "trigger_condition", "bad_change_shape", "protective_invariant",
+                "fix_shape", "source_commit", "confidence",
+            ],
+        },
+    },
+    {
+        "name": "search_org_scar_tissue",
+        "description": (
+            "Search GBrain for BugPatterns learned across ALL repos in your organization, "
+            "not just the current repo's ChromaDB index. Use this after search_scar_tissue "
+            "returns no strong matches — cross-repo patterns often catch things the local "
+            "index misses."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Semantic description of the code pattern to search for.",
+                },
+                "pr_file": {
+                    "type": "string",
+                    "description": "The file path this query relates to.",
+                },
+            },
+            "required": ["query", "pr_file"],
         },
     },
 ]
@@ -189,11 +255,13 @@ class Reviewer:
         scar_index: ScarIndex,
         nia: NiaClient,
         anthropic_client: anthropic.Anthropic,
+        gbrain_client: "GBrainClient | None" = None,
     ) -> None:
         self._scar = scar_index
         self._nia = nia
         # Accept either Anthropic or AsyncAnthropic — review() is always async
         self._claude = anthropic_client
+        self._gbrain = gbrain_client
 
     # ── tool execution ────────────────────────────────────────────────────────
 
@@ -237,6 +305,53 @@ class Reviewer:
                 if any(tok in msg for tok in ("404", "not found", "not indexed", "unauthorized")):
                     return {"error": "Nia has not yet indexed this repo, skip this tool for now"}
                 return {"error": f"Nia search failed: {exc}"}
+
+        if name == "search_org_scar_tissue":
+            if self._gbrain is None:
+                return []
+            try:
+                patterns = await self._gbrain.search(inp["query"], top_k=5)
+                return [
+                    {
+                        "pattern_id": p.id,
+                        "trigger_condition": p.trigger_condition,
+                        "bad_change_shape": p.bad_change_shape,
+                        "protective_invariant": p.protective_invariant,
+                        "fix_shape": p.fix_shape,
+                        "source_repo": p.source_repo,
+                        "source_commit": p.source_commit,
+                        "confidence": round(p.confidence, 4),
+                        "learned_from": p.learned_from,
+                        "learned_at": p.learned_at,
+                    }
+                    for p in patterns
+                ]
+            except Exception as exc:
+                logger.warning("[search_org_scar_tissue] GBrain search failed: %s", exc)
+                return []
+
+        if name == "learn_from_incident":
+            if self._gbrain is None:
+                return {"ok": False, "reason": "GBrain not configured — pattern not saved"}
+            try:
+                from app.services.gbrain_client import BugPattern
+                pattern = BugPattern(
+                    trigger_condition=inp["trigger_condition"],
+                    bad_change_shape=inp["bad_change_shape"],
+                    protective_invariant=inp["protective_invariant"],
+                    fix_shape=inp["fix_shape"],
+                    affected_symbols=inp.get("affected_symbols", []),
+                    source_commit=inp["source_commit"],
+                    source_repo=pr.upstream_repo or pr.repo,
+                    confidence=float(inp["confidence"]),
+                    learned_from="live_warning",
+                )
+                slug = await self._gbrain.write_pattern(pattern)
+                logger.info("[learn_from_incident] wrote pattern slug=%s", slug)
+                return {"ok": True, "pattern_id": slug, "learned_from": "live_warning"}
+            except Exception as exc:
+                logger.warning("[learn_from_incident] GBrain write failed: %s", exc)
+                return {"error": f"GBrain write failed: {exc}"}
 
         return {"error": f"Unknown tool: {name!r}"}
 
@@ -316,6 +431,7 @@ class Reviewer:
                             explanation=inp["explanation"],
                             confidence=float(inp["confidence"]),
                             proposed_fix=inp.get("proposed_fix"),
+                            learned_from=inp.get("learned_from", "git_history"),
                         )
                         key: _DedupKey = (w.pr_file, w.pr_hunk, sha)
                         existing = dedup.get(key)

@@ -35,6 +35,7 @@ class Warning(BaseModel):
     explanation: str
     confidence: float = Field(ge=0.0, le=1.0)
     proposed_fix: Optional[str] = None
+    learned_from: str = "git_history"  # "git_history" | "live_warning" | "merge_webhook"
 
 
 class IndexRequest(BaseModel):
