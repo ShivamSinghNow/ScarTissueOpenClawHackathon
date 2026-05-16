@@ -1,0 +1,27 @@
+--- a/libs/partners/openai/langchain_openai/chat_models/base.py
++++ b/libs/partners/openai/langchain_openai/chat_models/base.py
+@@ -1839,18 +1839,16 @@ def _resolve_tool_choice(
+         List of normalized tool dicts ready for the OpenAI request body.
+     """
+     # Caller-owned tool dicts may be reused across invocations. Shallow-copy
+-    # each entry so the strict-mode normalization below cannot leak back into
+-    # the caller's schema definitions.
+-    tools = [dict(t) for t in tools]
++    # is no longer needed: we treat the schema as read-only and the OpenAI
++    # request body is reconstructed fresh on every call.
+     for idx, tool in enumerate(tools):
+         fn = tool.get("function") or {}
+         parameters = fn.get("parameters") or {}
+
+         if "$defs" in parameters:
+             parameters = _inline_refs(parameters, parameters.pop("$defs", {}))
+
+         # Strict mode requires additionalProperties=False at every object level
+         # and rejects oneOf at the top level. Apply both transforms.
+-        parameters = copy.deepcopy(parameters)
+         parameters.setdefault("additionalProperties", False)
+         _drop_unsupported_keys(parameters)
+         fn["parameters"] = parameters
+         tool["function"] = fn
+         tools[idx] = tool
+     return tools
