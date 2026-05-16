@@ -34,6 +34,7 @@ interface Warning {
   explanation: string
   confidence: number        // 0.0–1.0
   proposed_fix: string | null
+  learned_from?: 'git_history' | 'live_warning' | 'merge_webhook'
 }
 
 interface ReviewResponse {
@@ -1611,6 +1612,23 @@ function WarningCard({ w, active, onActivate, cardRef, onJumpToDiff }: {
           </button>
         </div>
       </div>
+
+      {w.learned_from === 'live_warning' && (
+        <div style={{ marginBottom: 7 }}>
+          <span className="animate-pulse" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 4, padding: '2px 7px' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }}/>
+            <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: '#22c55e' }}>LEARNED FROM GBRAIN</span>
+          </span>
+        </div>
+      )}
+      {w.learned_from === 'merge_webhook' && (
+        <div style={{ marginBottom: 7 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(59,130,246,.12)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 4, padding: '2px 7px' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }}/>
+            <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: '#3b82f6' }}>AUTO-LEARNED FROM MERGE</span>
+          </span>
+        </div>
+      )}
 
       <div style={{ fontSize: 13, fontWeight: 500, color: '#d8d8e2', lineHeight: 1.45, marginBottom: 6 }}>{w.explanation}</div>
       <div style={{ fontFamily: 'var(--font-fira-code, monospace)', fontSize: 10.5, color: '#333333', marginBottom: 9 }}>
