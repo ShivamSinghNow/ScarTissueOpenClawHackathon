@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from typing import Optional
 
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 from app.models.schemas import Incident
+
+if TYPE_CHECKING:
+    from app.services.gbrain_client import GBrainClient
 
 _MODEL_NAME = "all-MiniLM-L6-v2"
 _MAX_QUERY_CHARS = 8_000
@@ -117,6 +121,63 @@ class ScarIndex:
                 continue
 
         return out
+
+    async def search_with_gbrain(
+        self,
+        repo: str,
+        query: str,
+        top_k: int = 5,
+        gbrain_client: 'GBrainClient | None' = None,
+    ) -> list[dict]:
+        results: list[dict] = []
+        seen_source_commits: set[str] = set()
+
+        if gbrain_client is not None:
+            try:
+                gbrain_hits = await gbrain_client.search(query, top_k=top_k)
+            except Exception:
+                gbrain_hits = []
+
+            for pattern in gbrain_hits:
+                if pattern.source_commit in seen_source_commits:
+                    continue
+
+                results.append(
+                    {
+                        'source_commit': pattern.source_commit,
+                        'message': pattern.trigger_condition,
+                        'score': pattern.confidence,
+                        'learned_from': pattern.learned_from,
+                        'source': 'gbrain',
+                        'incident': None,
+                        'bug_pattern': pattern,
+                    }
+                )
+                seen_source_commits.add(pattern.source_commit)
+
+        for incident, score in self.search(repo, query, top_k=top_k):
+            if len(results) >= top_k:
+                break
+            if incident.commit_sha in seen_source_commits:
+                continue
+
+            results.append(
+                {
+                    'source_commit': incident.commit_sha,
+                    'message': incident.commit_message.splitlines()[0][:200],
+                    'score': score,
+                    'learned_from': 'git_history',
+                    'source': 'chromadb',
+                    'incident': incident,
+                    'bug_pattern': None,
+                }
+            )
+            seen_source_commits.add(incident.commit_sha)
+            if len(results) >= top_k:
+                break
+
+        results.sort(key=lambda r: r['score'], reverse=True)
+        return results[:top_k]
 
     def get_by_sha(self, repo: str, commit_sha: str) -> Incident | None:
         try:
